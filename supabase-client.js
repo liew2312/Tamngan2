@@ -21,8 +21,9 @@
   function uUser(r) { return { UserID: r.id, Name: r.name, Role: r.role, Email: r.email || '', Color: r.color, IsBoss: r.is_boss ? 'TRUE' : '', Photo: r.photo || '', Status: r.status || '', Active: r.active === false ? 'FALSE' : 'TRUE' }; }
   function uTask(r) { return { TaskID: r.id, Project: r.project || '', Title: r.title || '', Description: r.description || '', AssigneeID: r.assignee || '', DueDate: dbToDMY(r.due_date), Status: r.status || 'ยังไม่เริ่ม', Progress: parseInt(r.progress) || 0, Priority: r.priority || 'ปกติ', CompletedAt: r.completed_at || '', comments: [], dueLog: [] }; }
 
-  /* ---------- Auth (OTP ทางอีเมล) ---------- */
-  SB.sendOtp = (email) => SB.client.auth.signInWithOtp({ email: email, options: { shouldCreateUser: true } });
+  /* ---------- Auth (อีเมล: กดลิงก์ หรือกรอกรหัส) ---------- */
+  SB.appUrl = location.origin + location.pathname; // ปลายทางให้ magic link เด้งกลับ
+  SB.sendOtp = (email) => SB.client.auth.signInWithOtp({ email: email, options: { shouldCreateUser: true, emailRedirectTo: SB.appUrl } });
   SB.verifyOtp = (email, token) => SB.client.auth.verifyOtp({ email: email, token: token, type: 'email' });
   SB.signOut = () => SB.client.auth.signOut();
   SB.getSessionEmail = async () => {

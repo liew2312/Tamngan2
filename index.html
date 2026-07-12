@@ -669,7 +669,7 @@
       document.getElementById('screen-login').classList.remove('hidden');
       otpStage = false;
       document.getElementById('otp-wrap').classList.add('hidden');
-      setLoginBtn(false, SB_MODE() ? '<i class="fa-solid fa-paper-plane"></i> ส่งรหัสเข้าอีเมล' : '<i class="fa-brands fa-google"></i> เข้าสู่ระบบ');
+      setLoginBtn(false, SB_MODE() ? '<i class="fa-solid fa-paper-plane"></i> ส่งลิงก์เข้าอีเมล' : '<i class="fa-brands fa-google"></i> เข้าสู่ระบบ');
     }
     function onLogin() {
       loginErr('');
@@ -684,8 +684,8 @@
         if (error) { setLoginBtn(false, '<i class="fa-solid fa-paper-plane"></i> ส่งรหัสเข้าอีเมล'); loginErr(error.message); return; }
         otpStage = true;
         document.getElementById('otp-wrap').classList.remove('hidden');
-        setLoginBtn(false, '<i class="fa-solid fa-check"></i> ยืนยันรหัส');
-        loginErr('ส่งรหัส 6 หลักไปที่อีเมลแล้ว กรอกรหัสเพื่อเข้าสู่ระบบ');
+        setLoginBtn(false, '<i class="fa-solid fa-check"></i> ยืนยันรหัส (ถ้ามี)');
+        loginErr('ส่งอีเมลแล้ว — เปิดเมลแล้วกดปุ่ม "Sign in" เพื่อเข้าระบบ (ถ้าตั้งค่าให้ส่งรหัส ค่อยกรอกด้านล่าง)');
       }).catch(e => { setLoginBtn(false, '<i class="fa-solid fa-paper-plane"></i> ส่งรหัสเข้าอีเมล'); loginErr(e.message); });
     }
     function sbVerifyOtp() {
