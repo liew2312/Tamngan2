@@ -25,6 +25,7 @@
   SB.appUrl = location.origin + location.pathname; // ปลายทางให้ magic link เด้งกลับ
   SB.sendOtp = (email) => SB.client.auth.signInWithOtp({ email: email, options: { shouldCreateUser: true, emailRedirectTo: SB.appUrl } });
   SB.verifyOtp = (email, token) => SB.client.auth.verifyOtp({ email: email, token: token, type: 'email' });
+  SB.signInGoogle = () => SB.client.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: SB.appUrl } });
   SB.signOut = () => SB.client.auth.signOut();
   SB.getSessionEmail = async () => {
     const { data } = await SB.client.auth.getSession();

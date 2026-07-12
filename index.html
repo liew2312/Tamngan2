@@ -214,6 +214,8 @@
         <h1>ตามงาน</h1>
         <p class="sub2">ระบบบริหารและติดตามงานของทีม</p>
         <div class="card">
+          <button class="btn" id="btn-google" onclick="sbGoogle()" style="width:100%; background:#fff; color:#333a4d; border:1px solid var(--border); box-shadow:var(--shadow); margin-bottom:14px;"><i class="fa-brands fa-google" style="color:#ea4335;"></i> เข้าสู่ระบบด้วย Google</button>
+          <div id="or-line" style="text-align:center; color:var(--muted); font-size:11px; margin-bottom:12px;">— หรือรับลิงก์ทางอีเมล —</div>
           <label>เข้าสู่ระบบด้วย Gmail</label>
           <input id="login-email" type="email" inputmode="email" autocomplete="email" placeholder="you@gmail.com"
                  onkeydown="if(event.key==='Enter')onLogin()">
@@ -669,7 +671,15 @@
       document.getElementById('screen-login').classList.remove('hidden');
       otpStage = false;
       document.getElementById('otp-wrap').classList.add('hidden');
+      const g = document.getElementById('btn-google'), ol = document.getElementById('or-line');
+      if (g) g.classList.toggle('hidden', !SB_MODE());
+      if (ol) ol.classList.toggle('hidden', !SB_MODE());
       setLoginBtn(false, SB_MODE() ? '<i class="fa-solid fa-paper-plane"></i> ส่งลิงก์เข้าอีเมล' : '<i class="fa-brands fa-google"></i> เข้าสู่ระบบ');
+    }
+    function sbGoogle() {
+      loginErr('');
+      if (!SB_MODE()) return;
+      window.SB.signInGoogle().catch(e => loginErr((e && e.message) || 'เข้าสู่ระบบด้วย Google ไม่สำเร็จ'));
     }
     function onLogin() {
       loginErr('');
