@@ -1,0 +1,15 @@
+{
+  "name": "ตามงาน",
+  "short_name": "ตามงาน",
+  "description": "ระบบบริหารและติดตามงานของทีม",
+  "lang": "th",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#eef2f8",
+  "theme_color": "#5b82e0",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}
