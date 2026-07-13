@@ -33,21 +33,24 @@
   <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <style>
+    @font-face{font-family:'AP';src:url('fonts/AP-Regular.ttf') format('truetype');font-weight:400;font-style:normal;font-display:swap;}
+    @font-face{font-family:'AP';src:url('fonts/AP-Medium.ttf') format('truetype');font-weight:500;font-style:normal;font-display:swap;}
+    @font-face{font-family:'AP';src:url('fonts/AP-Bold.ttf') format('truetype');font-weight:700;font-style:normal;font-display:swap;}
     :root {
-      /* Pastel — เพิ่มความสด/คอนทราสต์ให้ชัดขึ้น */
-      --bg: #eef2f8; --card: #ffffff; --text: #2b3142; --muted: #838ea3;
-      --border: #e7ecf4;
-      --shadow: 0 2px 10px rgba(90,105,145,.09);
-      --shadow-lg: 0 10px 28px rgba(90,105,145,.18);
+      /* AP Thailand — warm cream canvas, signature red, ink text */
+      --bg: #F8F7F3; --card: #ffffff; --text: #131317; --muted: #70707A;
+      --border: #E4E1D8;
+      --shadow: 0 2px 10px rgba(20,14,14,.07);
+      --shadow-lg: 0 12px 30px rgba(20,14,14,.16);
 
-      --primary: #5b82e0; --primary-soft: #e3ecfd; --primary-fg: #3a5fc4;
-      --rose: #e8536e; --rose-soft: #fce0e6; --rose-fg: #d13a58;
-      --amber: #e8942f; --amber-soft: #fcedd4; --amber-fg: #bd7412;
-      --mint: #22a97a; --mint-soft: #d3f1e4; --mint-fg: #178a63;
-      --grey-soft: #eaeef5; --grey-fg: #8590a4;
+      --primary: #921C1E; --primary-soft: #FAEBEB; --primary-fg: #921C1E;
+      --rose: #921C1E; --rose-soft: #FAEBEB; --rose-fg: #921C1E;
+      --amber: #B5791A; --amber-soft: #F6ECD6; --amber-fg: #8A5A10;
+      --mint: #2F7A4F; --mint-soft: #E8F1EC; --mint-fg: #2F7A4F;
+      --grey-soft: #F0EEE8; --grey-fg: #9C9CA4;
     }
     * { box-sizing: border-box; }
-    body { font-family: 'Prompt', sans-serif; background: var(--bg); color: var(--text); margin: 0; -webkit-font-smoothing: antialiased; }
+    body { font-family: 'AP','Prompt', sans-serif; background: var(--bg); color: var(--text); margin: 0; -webkit-font-smoothing: antialiased; }
     .app { max-width: 430px; margin: 0 auto; min-height: 100vh; position: relative; padding-bottom: 96px; overflow-x: hidden; }
 
     .hidden { display: none !important; }
@@ -67,7 +70,7 @@
 
     /* login */
     .login { min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 40px 28px; text-align: center; }
-    .login .logo { width: 78px; height: 78px; border-radius: 22px; background: linear-gradient(135deg,#7599e8,#5b82e0); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 32px; box-shadow: var(--shadow-lg); margin-bottom: 20px; }
+    .login .logo { width: 78px; height: 78px; border-radius: 22px; background: linear-gradient(135deg,#7599e8,#5b82e0); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 32px; box-shadow: var(--shadow-lg); margin-bottom: 20px; background: #921C1E !important; }
     .login h1 { font-size: 24px; margin: 0 0 6px; font-weight: 600; }
     .login .sub2 { color: var(--muted); font-size: 13px; margin: 0 0 26px; }
     .login .card { width: 100%; box-shadow: var(--shadow-lg); padding: 22px; text-align: left; margin: 0; }
@@ -104,6 +107,18 @@
     .greeting { color: var(--primary-fg); font-size: 12px; font-weight: 600; margin: 0; }
     .greeting i { margin-right: 5px; }
     h1.title { margin: 2px 0 0; font-size: 24px; font-weight: 600; }
+    /* member home (1a) */
+    .dash-date { font-size: 12.5px; color: var(--muted); margin: 3px 0 0; }
+    .mh-group { display: flex; align-items: center; gap: 8px; margin: 16px 2px 6px; font-size: 13px; font-weight: 700; letter-spacing: .02em; color: var(--text); }
+    .mh-group.over { color: var(--primary); }
+    .mh-group i { font-size: 12px; }
+    .mh-group .mh-gc { color: var(--grey-fg); font-weight: 600; font-size: 12px; }
+    .mh-row { display: flex; align-items: flex-start; gap: 12px; padding: 13px 2px; cursor: pointer; }
+    .mh-ck { width: 22px; height: 22px; border-radius: 999px; border: 2px solid var(--grey-fg); flex-shrink: 0; margin-top: 1px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: transform .12s; }
+    .mh-ck:active { transform: scale(.85); }
+    .mh-ck.done { background: var(--mint); border-color: var(--mint); color: #fff; }
+    .mh-ck.rev { background: var(--amber-soft); border-color: var(--amber); color: var(--amber-fg); }
+    .mh-ck i { font-size: 11px; }
 
     /* stats */
     .stats-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; padding: 6px 24px 6px; }
@@ -112,9 +127,9 @@
     .stat-card .st-ico { font-size: 15px; opacity: .95; }
     .stat-card h2 { margin: 6px 0 0; font-size: 26px; font-weight: 700; }
     .stat-card p { margin: 1px 0 0; font-size: 11px; font-weight: 500; opacity: .95; }
-    .stat-overdue { background: linear-gradient(135deg,#f26e85,#e8536e); }
-    .stat-today  { background: linear-gradient(135deg,#7599e8,#5b82e0); }
-    .stat-week   { background: linear-gradient(135deg,#3fc194,#22a97a); }
+    .stat-overdue { background: #921C1E; }
+    .stat-today  { background: #B5791A; }
+    .stat-week   { background: #2F7A4F; }
 
     /* chips */
     .filters { display: flex; gap: 8px; padding: 12px 24px 4px; overflow-x: auto; scrollbar-width: none; }
@@ -249,12 +264,14 @@
         <div style="flex-grow:1;">
           <p class="greeting"><i class="fa-solid fa-layer-group"></i>ภาพรวมทีม</p>
           <h1 class="title">งานของทีม</h1>
+          <p class="dash-date hidden" id="dash-date"></p>
         </div>
         <div style="display:flex; align-items:center; gap:12px;">
           <button id="bell-btn" class="icon-btn" onclick="openNotifs()" title="การแจ้งเตือน" style="position:relative;"><i class="fa-solid fa-bell"></i><span id="bell-badge" class="bell-badge hidden">0</span></button>
           <div class="avatar" id="me-avatar" style="background:var(--primary);" onclick="openProfile()" title="โปรไฟล์ของฉัน">W</div>
         </div>
       </div>
+      <div id="dash-progress" class="hidden" style="padding:0 24px;"></div>
       <div class="stats-grid">
         <div class="stat-card stat-overdue" onclick="setFilter('overdue')"><div class="st-ico"><i class="fa-solid fa-triangle-exclamation"></i></div><h2 id="st-overdue">0</h2><p>เลยกำหนด</p></div>
         <div class="stat-card stat-today" onclick="setFilter('today')"><div class="st-ico"><i class="fa-solid fa-bell"></i></div><h2 id="st-today">0</h2><p>ครบวันนี้</p></div>
@@ -1058,6 +1075,29 @@
       document.getElementById('st-overdue').innerText = scope.filter(t => matchFilter(t, 'overdue')).length;
       document.getElementById('st-today').innerText = scope.filter(t => matchFilter(t, 'today')).length;
       document.getElementById('st-week').innerText = scope.filter(t => matchFilter(t, 'week')).length;
+
+      const statsEl = document.querySelector('#screen-dashboard .stats-grid');
+      const filtersEl = document.getElementById('filters');
+      const progEl = document.getElementById('dash-progress');
+      const dateEl = document.getElementById('dash-date');
+
+      // ===== หน้าแรกลูกทีม (ดีไซน์ 1a: จัดกลุ่มตามเวลา) =====
+      if (!isBoss) {
+        if (statsEl) statsEl.classList.add('hidden');
+        if (filtersEl) filtersEl.classList.add('hidden');
+        if (progEl) progEl.classList.remove('hidden');
+        if (dateEl) dateEl.classList.remove('hidden');
+        renderMemberHome();
+        updateBell();
+        return;
+      }
+
+      // ===== หัวหน้า (คงเดิม) =====
+      if (statsEl) statsEl.classList.remove('hidden');
+      if (filtersEl) filtersEl.classList.remove('hidden');
+      if (progEl) progEl.classList.add('hidden');
+      if (dateEl) dateEl.classList.add('hidden');
+
       let html = '';
       // แถบเด้ง "งานรอตรวจ" สำหรับหัวหน้า
       if (isBoss) {
@@ -1084,6 +1124,97 @@
       document.getElementById('main-list').innerHTML = html;
       if (isBoss && dashFilter === 'team') initCardDrag();
       updateBell();
+    }
+
+    /* ---------- หน้าแรกลูกทีม (ดีไซน์ 1a) ---------- */
+    function timeGreeting() {
+      const h = new Date().getHours();
+      if (h < 12) return 'สวัสดีตอนเช้า';
+      if (h < 17) return 'สวัสดีตอนบ่าย';
+      return 'สวัสดีตอนเย็น';
+    }
+    function renderMemberHome() {
+      const g = document.querySelector('#screen-dashboard .greeting');
+      const nm = (currentUser && currentUser.Name) ? ', ' + currentUser.Name : '';
+      if (g) g.innerHTML = `<i class="fa-solid fa-hand-sparkles"></i>${timeGreeting()}${nm}`;
+      const ti = document.querySelector('#screen-dashboard h1.title');
+      if (ti) ti.innerText = 'วันนี้';
+      const dateEl = document.getElementById('dash-date');
+      if (dateEl) dateEl.innerText = new Date().toLocaleDateString('th-TH', { weekday: 'long', day: 'numeric', month: 'long' });
+
+      const mine = appData.tasks.filter(t => t.AssigneeID === myUserId && !isCancelled(t));
+      const total = mine.length;
+      const doneCnt = mine.filter(isDone).length;
+      const pctDone = total ? Math.round(doneCnt / total * 100) : 0;
+      const circ = 2 * Math.PI * 19;
+      const off = circ * (1 - pctDone / 100);
+      const progEl = document.getElementById('dash-progress');
+      if (progEl) progEl.innerHTML = `
+        <div class="card" style="display:flex; align-items:center; gap:14px; margin-bottom:16px;">
+          <div style="position:relative; width:52px; height:52px; flex-shrink:0;">
+            <svg width="52" height="52" viewBox="0 0 46 46"><circle cx="23" cy="23" r="19" fill="none" stroke="var(--grey-soft)" stroke-width="6"/><circle cx="23" cy="23" r="19" fill="none" stroke="var(--primary)" stroke-width="6" stroke-dasharray="${circ.toFixed(1)}" stroke-dashoffset="${off.toFixed(1)}" stroke-linecap="round" transform="rotate(-90 23 23)"/></svg>
+            <span style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:700; color:var(--primary);">${pctDone}%</span>
+          </div>
+          <div style="flex:1;">
+            <div style="font-size:15px; font-weight:600; color:var(--text);">เสร็จแล้ว ${doneCnt} จาก ${total} งาน</div>
+            <div style="font-size:12.5px; color:var(--muted);">${total === 0 ? 'ยังไม่มีงานที่ได้รับมอบหมาย' : (pctDone >= 100 ? 'เคลียร์งานหมดแล้ว เยี่ยมมาก' : 'ลุยอีกนิด ใกล้เคลียร์แล้ว')}</div>
+          </div>
+        </div>`;
+
+      const open = mine.filter(t => !isDone(t) && t.Status !== 'รอตรวจ');
+      const overdue = open.filter(t => { const d = daysUntil(t); return t.Status === 'เลยกำหนด' || (d !== null && d < 0); });
+      const today = open.filter(t => daysUntil(t) === 0 && t.Status !== 'เลยกำหนด');
+      const upcoming = open.filter(t => overdue.indexOf(t) < 0 && today.indexOf(t) < 0);
+      const review = mine.filter(t => t.Status === 'รอตรวจ');
+      const done = mine.filter(isDone);
+
+      const grp = (label, arr, cls) => arr.length
+        ? `<div class="mh-group ${cls || ''}"><span>${label}</span><span class="mh-gc">${arr.length}</span></div>` + arr.map(taskRow1a).join('')
+        : '';
+      let html = '';
+      html += grp('<i class="fa-solid fa-triangle-exclamation"></i> เลยกำหนด', overdue, 'over');
+      html += grp('วันนี้', today);
+      html += grp('ถัดไป', upcoming);
+      html += grp('รอหัวหน้าตรวจ', review);
+      html += grp('เสร็จแล้ว', done);
+      if (!total) html = emptyBox('ยังไม่มีงานที่ได้รับมอบหมาย', 'fa-mug-hot');
+      document.getElementById('main-list').innerHTML = html;
+    }
+    function taskRow1a(t) {
+      const done = isDone(t);
+      const review = t.Status === 'รอตรวจ';
+      const d = daysUntil(t);
+      const overdue = !done && !review && (t.Status === 'เลยกำหนด' || (d !== null && d < 0));
+      const ringColor = t.Priority === 'สูง' ? 'var(--primary)' : (t.Priority === 'ต่ำ' ? 'var(--grey-fg)' : 'var(--amber)');
+      const proj = t.Project || '';
+      const due = t.DueDate ? dueLabel(t) : '';
+      let circle;
+      if (done) circle = `<span class="mh-ck done"><i class="fa-solid fa-check"></i></span>`;
+      else if (review) circle = `<span class="mh-ck rev"><i class="fa-solid fa-hourglass-half"></i></span>`;
+      else circle = `<span class="mh-ck" style="border-color:${ringColor}" onclick="event.stopPropagation(); quickSubmitTask('${t.TaskID}')"></span>`;
+      const rowStyle = overdue
+        ? 'background:var(--primary-soft); border:1px solid #F3D4D4; border-radius:14px; padding:13px 14px; margin-bottom:8px;'
+        : 'border-bottom:1px solid var(--grey-soft);';
+      const titleStyle = done ? 'color:var(--grey-fg); text-decoration:line-through;' : (review ? 'color:var(--muted);' : 'color:var(--text);');
+      const dueColor = overdue ? 'var(--primary)' : 'var(--muted)';
+      return `<div class="mh-row" style="${rowStyle}" onclick="openTask('${t.TaskID}','dashboard')">
+          ${circle}
+          <div style="flex:1; min-width:0;">
+            <div style="font-size:15px; line-height:1.3; ${titleStyle}">${escapeHtml(t.Title || '')}</div>
+            <div style="font-size:12px; margin-top:3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${proj ? `<span style="color:var(--primary); font-weight:600;">${escapeHtml(proj)}</span>` : ''}${proj && due ? ' · ' : ''}${due ? `<span style="color:${dueColor};">${due}</span>` : ''}</div>
+          </div>
+          ${t.Priority === 'สูง' && !done && !review ? '<i class="fa-solid fa-flag" style="color:var(--primary); font-size:13px; margin-top:2px;"></i>' : ''}
+        </div>`;
+    }
+    function quickSubmitTask(id) {
+      if (!myUserId) { alert('บัญชีของคุณยังไม่ได้ลงทะเบียนในระบบ'); return; }
+      const t = appData.tasks.find(x => x.TaskID === id); if (!t) return;
+      srv('setStatus', [id, 'รอตรวจ'], (res) => {
+        t.Status = res.Status; t.Progress = res.Progress; t.CompletedAt = res.CompletedAt;
+        if (navigator.vibrate) navigator.vibrate(15);
+        showToast('ส่งงานให้หัวหน้าตรวจแล้ว');
+        renderAll();
+      });
     }
 
     /* ---------- กระดิ่งแจ้งเตือน ---------- */

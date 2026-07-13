@@ -35,7 +35,8 @@ function apiDispatch_(action, args) {
     updateProgress: updateProgress,
     saveComment: saveComment,
     setStatus: setStatus,
-    setTaskDone: setTaskDone
+    setTaskDone: setTaskDone,
+    touchActive: touchActive
   };
   if (!PUBLIC[action]) throw new Error('ไม่รู้จักคำสั่ง: ' + action);
   // args คือชุดเดียวกับที่ google.script.run รับ (รวม actorEmail เป็นตัวแรกแล้วถ้าจำเป็น)
@@ -120,7 +121,7 @@ function checkAndSetupDatabase() {
 
 // เพิ่มคอลัมน์ที่ยังไม่มีให้ชีต Users เดิม (ไม่ลบข้อมูลเดิม)
 function ensureUserColumns_(sheet) {
-  ['Email', 'IsBoss', 'Photo', 'Status', 'Active'].forEach(h => {
+  ['Email', 'IsBoss', 'Photo', 'Status', 'Active', 'LastLogin'].forEach(h => {
     const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0].map(String);
     if (headers.indexOf(h) === -1) {
       sheet.getRange(1, sheet.getLastColumn() + 1).setValue(h);
@@ -486,6 +487,13 @@ function deleteMember(actorEmail, userId) {
   for (let i = data.length - 1; i >= 1; i--) {
     if (data[i][0] === userId) { sheet.deleteRow(i + 1); break; }
   }
+  return true;
+}
+
+// บันทึกเวลาเข้าใช้งานล่าสุดของผู้ใช้ปัจจุบัน
+function touchActive(actorEmail) {
+  const me = resolveCurrentUser_(actorEmail);
+  if (me.UserID) setUserFields_(me.UserID, { LastLogin: new Date().toISOString() });
   return true;
 }
 
