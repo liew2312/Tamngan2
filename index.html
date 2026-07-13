@@ -423,7 +423,7 @@
     </div>
 
     <!-- ปุ่มเพิ่มงานแบบลอย (หัวหน้า) -->
-    <button id="fab-add" class="fab hidden" onclick="openAddSheet()" title="เพิ่มงาน"><i class="fa-solid fa-plus"></i></button>
+    <button id="fab-add" class="fab hidden" onclick="fabAction()" title="เพิ่ม"><i class="fa-solid fa-plus"></i></button>
   </div>
 
   <!-- add/edit To-do modal -->
@@ -457,6 +457,10 @@
       <div class="sheet-item" onclick="closeOverlay('sheet'); openMemberModal()">
         <div class="si-ico" style="background:var(--mint);"><i class="fa-solid fa-user-plus"></i></div>
         <div>เพิ่มลูกน้อง<div class="meta">เพิ่มสมาชิกเข้าทีม</div></div>
+      </div>
+      <div class="sheet-item" onclick="closeOverlay('sheet'); openTodoModal()">
+        <div class="si-ico" style="background:var(--amber);"><i class="fa-solid fa-clipboard-check"></i></div>
+        <div>เพิ่มสิ่งที่ต้องทำ<div class="meta">โน้ตงานส่วนตัวของฉัน</div></div>
       </div>
       <div class="sheet-cancel" onclick="closeOverlay('sheet')">ยกเลิก</div>
     </div>
@@ -985,9 +989,9 @@
       document.getElementById(id).classList.remove('hidden');
       // ซ่อน bottom nav บนหน้ารายละเอียดงาน (มีช่องแชทอยู่ล่างสุด)
       document.getElementById('nav').classList.toggle('hidden', id === 'screen-task');
-      // ปุ่มลอยเพิ่มงาน: โชว์เฉพาะหัวหน้า และไม่โชว์บนหน้ารายละเอียดงาน
+      // ปุ่มลอยเพิ่ม: โชว์ให้ทุกคนที่ล็อกอิน (หัวหน้า=เมนูเพิ่ม, พนักงาน=เพิ่มสิ่งที่ต้องทำ) ยกเว้นหน้ารายละเอียดงาน
       const fab = document.getElementById('fab-add');
-      if (fab) fab.classList.toggle('hidden', !(isBoss && id !== 'screen-task'));
+      if (fab) fab.classList.toggle('hidden', !(myUserId && id !== 'screen-task'));
       window.scrollTo(0, 0);
     }
     function goBack(target) {
@@ -1122,19 +1126,15 @@
     }
     function renderTodos() {
       const el = document.getElementById('tasks-todo'); if (!el) return;
-      const list = getTodos().slice().sort((a, b) => {
-        if (!!a.done !== !!b.done) return a.done ? 1 : -1;                 // ยังไม่เสร็จก่อน
-        const da = parseDMY(a.date), db = parseDMY(b.date);
+      // เก็บ index จริงไว้กับแต่ละรายการ (กันบั๊ก index เพี้ยนตอน sort)
+      const items = getTodos().map((t, i) => ({ t, i })).sort((a, b) => {
+        if (!!a.t.done !== !!b.t.done) return a.t.done ? 1 : -1;          // ยังไม่เสร็จก่อน
+        const da = parseDMY(a.t.date), db = parseDMY(b.t.date);
         if (da && db) return da - db; if (da) return -1; if (db) return 1; return 0;
       });
-      // แม็ปกลับไปยัง index จริงใน storage
-      const raw = getTodos();
-      const idxOf = t => raw.indexOf(t);
-      el.innerHTML =
-        `<button class="btn btn-primary" style="width:100%; margin-bottom:14px;" onclick="openTodoModal()"><i class="fa-solid fa-plus"></i> เพิ่มสิ่งที่ต้องทำ</button>` +
-        (list.length
-          ? `<div class="card" style="padding:4px 14px;">${list.map(t => todoRow(t, idxOf(t))).join('')}</div>`
-          : emptyBox('ยังไม่มีรายการ เพิ่มสิ่งที่ต้องทำได้เลย', 'fa-clipboard-check'));
+      el.innerHTML = items.length
+        ? `<div class="card" style="padding:4px 14px;">${items.map(o => todoRow(o.t, o.i)).join('')}</div>`
+        : emptyBox('ยังไม่มีรายการ — กดปุ่ม + มุมขวาล่างเพื่อเพิ่ม', 'fa-clipboard-check');
     }
     function toggleTodo(i) { const list = getTodos(); if (list[i]) { list[i].done = !list[i].done; setTodos(list); renderTodos(); } }
     function delTodo(i) { if (!confirm('ลบรายการนี้?')) return; const list = getTodos(); list.splice(i, 1); setTodos(list); renderTodos(); }
@@ -1572,6 +1572,7 @@
 
     /* ---------- overlays ---------- */
     function openAddSheet() { document.getElementById('sheet').classList.remove('hidden'); }
+    function fabAction() { if (isBoss) openAddSheet(); else openTodoModal(); }
     function closeOverlay(id) { document.getElementById(id).classList.add('hidden'); }
 
     function assigneeOptions(selectedId) {
