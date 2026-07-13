@@ -1096,7 +1096,8 @@
       const list = [];
       appData.tasks.filter(t => t.AssigneeID === myUserId && !isClosed(t)).forEach(t => {
         const d = daysUntil(t);
-        if (t.Status === 'เลยกำหนด' || (d !== null && d < 0)) list.push({ t, label: 'งานเลยกำหนด', sub: t.Title, icon: 'fa-triangle-exclamation', color: 'var(--rose-fg)' });
+        if (t.Status === 'ยังไม่เริ่ม' || !t.Status) list.push({ t, label: 'งานใหม่ที่ได้รับมอบหมาย', sub: t.Title, icon: 'fa-clipboard-list', color: 'var(--mint-fg)' });
+        else if (t.Status === 'เลยกำหนด' || (d !== null && d < 0)) list.push({ t, label: 'งานเลยกำหนด', sub: t.Title, icon: 'fa-triangle-exclamation', color: 'var(--rose-fg)' });
         else if (d === 0) list.push({ t, label: 'ครบกำหนดวันนี้', sub: t.Title, icon: 'fa-bell', color: 'var(--primary-fg)' });
       });
       return list;
@@ -1581,17 +1582,22 @@
     function renderActions() {
       const t = currentTask, box = document.getElementById('t-actions'), mine = (t.AssigneeID === myUserId);
       let h = '';
-      if (!isClosed(t)) {
+      if (isClosed(t)) {
+        if (isBoss) h += `<button class="btn btn-ghost" onclick="changeStatus('กำลังทำ')"><i class="fa-solid fa-rotate-left"></i> เปิดงานนี้ใหม่</button>`;
+      } else if (t.Status === 'รอตรวจ' && isBoss) {
+        // น้องส่งงานมาแล้ว → หัวหน้ารับงาน/ตีกลับ
+        h += `<div style="background:var(--amber-soft); color:var(--amber-fg); border-radius:12px; padding:9px 12px; font-size:12.5px; font-weight:600; text-align:center;"><i class="fa-solid fa-hourglass-half"></i> น้องส่งงานนี้มาให้ตรวจ</div>`;
+        h += `<button class="btn btn-primary" style="background:var(--mint);" onclick="changeStatus('เสร็จแล้ว')"><i class="fa-solid fa-circle-check"></i> รับงาน · อนุมัติผ่าน</button>`;
+        h += `<button class="btn btn-ghost" onclick="changeStatus('กำลังทำ')"><i class="fa-solid fa-rotate-left"></i> ตีกลับให้แก้</button>`;
+      } else {
         if (mine || isBoss) {
           if (t.Status !== 'กำลังทำ') h += `<button class="btn btn-ghost" onclick="changeStatus('กำลังทำ')"><i class="fa-solid fa-play"></i> เริ่ม/กำลังทำ</button>`;
-          if (t.Status !== 'รอตรวจ') h += `<button class="btn btn-primary" onclick="changeStatus('รอตรวจ')"><i class="fa-solid fa-paper-plane"></i> ส่งงานให้หัวหน้าตรวจ</button>`;
+          h += `<button class="btn btn-primary" onclick="changeStatus('รอตรวจ')"><i class="fa-solid fa-paper-plane"></i> ส่งงานให้หัวหน้าตรวจ</button>`;
         }
         if (isBoss) {
           h += `<button class="btn btn-primary" style="background:var(--mint);" onclick="changeStatus('เสร็จแล้ว')"><i class="fa-solid fa-circle-check"></i> อนุมัติว่าเสร็จ</button>`;
           h += `<button class="btn btn-ghost" onclick="changeStatus('ยกเลิก')"><i class="fa-solid fa-ban"></i> ยกเลิกงาน</button>`;
         }
-      } else {
-        if (isBoss) h += `<button class="btn btn-ghost" onclick="changeStatus('กำลังทำ')"><i class="fa-solid fa-rotate-left"></i> เปิดงานนี้ใหม่</button>`;
       }
       box.innerHTML = h;
     }
