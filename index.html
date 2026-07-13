@@ -183,6 +183,7 @@
     .drag-grip { cursor: grab; }
     .fab { position: fixed; right: 18px; bottom: calc(78px + env(safe-area-inset-bottom)); width: 56px; height: 56px; border-radius: 50%; background: var(--primary); color: #fff; border: none; font-size: 22px; box-shadow: 0 6px 18px rgba(91,130,224,.5); cursor: pointer; z-index: 26; display: flex; align-items: center; justify-content: center; transition: transform .15s; }
     .fab:active { transform: scale(.9); }
+    .bell-badge { position: absolute; top: -3px; right: -3px; background: var(--rose); color: #fff; font-size: 9.5px; font-weight: 700; min-width: 17px; height: 17px; border-radius: 999px; display: flex; align-items: center; justify-content: center; padding: 0 4px; box-shadow: 0 1px 3px rgba(0,0,0,.2); }
     .nav-badge { position: absolute; top: 2px; left: 54%; background: var(--rose); color: #fff; font-size: 9.5px; font-weight: 700; min-width: 16px; height: 16px; border-radius: 999px; display: flex; align-items: center; justify-content: center; padding: 0 4px; box-shadow: 0 1px 3px rgba(0,0,0,.2); }
 
     /* toast */
@@ -247,7 +248,10 @@
           <p class="greeting"><i class="fa-solid fa-layer-group"></i>ภาพรวมทีม</p>
           <h1 class="title">งานของทีม</h1>
         </div>
-        <div class="avatar" id="me-avatar" style="background:var(--primary);" onclick="openProfile()" title="โปรไฟล์ของฉัน">W</div>
+        <div style="display:flex; align-items:center; gap:12px;">
+          <button id="bell-btn" class="icon-btn" onclick="openNotifs()" title="การแจ้งเตือน" style="position:relative;"><i class="fa-solid fa-bell"></i><span id="bell-badge" class="bell-badge hidden">0</span></button>
+          <div class="avatar" id="me-avatar" style="background:var(--primary);" onclick="openProfile()" title="โปรไฟล์ของฉัน">W</div>
+        </div>
       </div>
       <div class="stats-grid">
         <div class="stat-card stat-overdue" onclick="setFilter('overdue')"><div class="st-ico"><i class="fa-solid fa-triangle-exclamation"></i></div><h2 id="st-overdue">0</h2><p>เลยกำหนด</p></div>
@@ -440,6 +444,15 @@
         <button class="btn btn-ghost" onclick="closeOverlay('modal-todo')">ยกเลิก</button>
         <button class="btn btn-primary" onclick="saveTodo()"><i class="fa-solid fa-check"></i> บันทึก</button>
       </div>
+    </div>
+  </div>
+
+  <!-- notifications modal -->
+  <div id="modal-notifs" class="backdrop modal-wrap hidden" onclick="if(event.target===this)closeOverlay('modal-notifs')">
+    <div class="modal">
+      <h3><i class="fa-solid fa-bell"></i>การแจ้งเตือน</h3>
+      <div id="notifs-list"></div>
+      <div class="modal-actions"><button class="btn btn-ghost" onclick="closeOverlay('modal-notifs')">ปิด</button></div>
     </div>
   </div>
 
@@ -1068,6 +1081,38 @@
       }
       document.getElementById('main-list').innerHTML = html;
       if (isBoss && dashFilter === 'team') initCardDrag();
+      updateBell();
+    }
+
+    /* ---------- กระดิ่งแจ้งเตือน ---------- */
+    function getNotifs() {
+      if (isBoss) {
+        return appData.tasks.filter(t => t.Status === 'รอตรวจ').map(t => ({
+          t, label: (t.AssigneeName || 'ลูกน้อง') + ' ส่งงานให้ตรวจ', sub: t.Title, icon: 'fa-hourglass-half', color: 'var(--amber-fg)'
+        }));
+      }
+      const list = [];
+      appData.tasks.filter(t => t.AssigneeID === myUserId && !isClosed(t)).forEach(t => {
+        const d = daysUntil(t);
+        if (t.Status === 'เลยกำหนด' || (d !== null && d < 0)) list.push({ t, label: 'งานเลยกำหนด', sub: t.Title, icon: 'fa-triangle-exclamation', color: 'var(--rose-fg)' });
+        else if (d === 0) list.push({ t, label: 'ครบกำหนดวันนี้', sub: t.Title, icon: 'fa-bell', color: 'var(--primary-fg)' });
+      });
+      return list;
+    }
+    function updateBell() {
+      const b = document.getElementById('bell-badge'); if (!b) return;
+      const n = getNotifs().length;
+      if (n > 0) { b.innerText = n > 9 ? '9+' : n; b.classList.remove('hidden'); } else b.classList.add('hidden');
+    }
+    function openNotifs() {
+      const list = getNotifs();
+      document.getElementById('notifs-list').innerHTML = list.length ? list.map(o => `
+        <div class="row" style="padding:11px 0; border-bottom:1px solid var(--border); cursor:pointer;" onclick="closeOverlay('modal-notifs'); openTask('${o.t.TaskID}','dashboard')">
+          <div class="si-ico" style="width:38px; height:38px; border-radius:11px; background:${o.color}; color:#fff; display:flex; align-items:center; justify-content:center;"><i class="fa-solid ${o.icon}"></i></div>
+          <div style="flex-grow:1; min-width:0;"><h4 style="margin:0; font-size:14px;">${o.label}</h4><p class="meta" style="margin:1px 0 0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(o.sub || '')}</p></div>
+          <i class="fa-solid fa-chevron-right" style="color:var(--muted);"></i>
+        </div>`).join('') : emptyBox('ไม่มีการแจ้งเตือน', 'fa-bell-slash');
+      document.getElementById('modal-notifs').classList.remove('hidden');
     }
 
     /* ---------- ลากจัดลำดับการ์ดสมาชิก (กดค้างเพื่อลาก) ---------- */
