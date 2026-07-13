@@ -15,6 +15,7 @@ create table if not exists app_users (
   photo      text,
   status     text,
   active     boolean default true,
+  last_login timestamptz,
   created_at timestamptz default now()
 );
 

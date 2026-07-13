@@ -443,6 +443,16 @@
     </div>
   </div>
 
+  <!-- activity (การเข้าใช้งานล่าสุด) modal -->
+  <div id="modal-activity" class="backdrop modal-wrap hidden" onclick="if(event.target===this)closeOverlay('modal-activity')">
+    <div class="modal">
+      <h3><i class="fa-solid fa-clock-rotate-left"></i>การเข้าใช้งานล่าสุด</h3>
+      <p class="sub">เรียงจากคนที่เข้าใช้งานล่าสุด</p>
+      <div id="activity-list"></div>
+      <div class="modal-actions"><button class="btn btn-ghost" onclick="closeOverlay('modal-activity')">ปิด</button></div>
+    </div>
+  </div>
+
   <!-- toast แจ้งเตือน -->
   <div id="toast" class="toast" onclick="toastAction()"><i class="fa-solid fa-bell"></i><span id="toast-msg"></span></div>
 
@@ -777,6 +787,7 @@
         document.getElementById('screen-login').classList.add('hidden');
         activeTab = 'home'; switchTab('home');
         maybeAskNotif();
+        srv('touchActive', [], () => {}); // บันทึกเวลาเข้าใช้งานล่าสุด
         if (SB_MODE()) { window.SB.subscribe(() => reloadData()); } // realtime: อัปเดตทันที
         startReviewPoll(); // สำรอง: ดึงซ้ำทุก 60 วิ เผื่อ realtime ไม่ถึง
       };
@@ -874,6 +885,7 @@
         const prog = st === 'เสร็จแล้ว' ? 100 : (cur && cur.Progress >= 100 ? 90 : (cur ? cur.Progress : 0));
         return { TaskID: a[0], Status: st, Progress: prog, CompletedAt: st === 'เสร็จแล้ว' ? new Date().toISOString() : '' };
       }
+      if (fn === 'touchActive') return true;
       if (fn === 'updateProfile') return { UserID: myUserId, Photo: a[0], Status: a[1] };
       if (fn === 'updateMember') return { UserID: a[0], Name: a[1], Role: a[2], Email: a[3], IsBoss: a[4] ? 'TRUE' : '', Active: a[5] ? 'TRUE' : 'FALSE' };
       return true;
@@ -1348,6 +1360,7 @@
       if (isBoss) {
         items.push({ ico: 'fa-users', bg: 'var(--primary)', t: 'ทีมงาน', s: 'จัดการสมาชิก / เพิ่ม-ปิด-ลบ', fn: "switchTab('team')" });
         items.push({ ico: 'fa-chart-simple', bg: 'var(--mint)', t: 'ผลงาน (KPI)', s: 'Performance ของทีม', fn: "setPerfTab('perf'); switchTab('performance')" });
+        items.push({ ico: 'fa-clock-rotate-left', bg: 'var(--amber)', t: 'การเข้าใช้งานล่าสุด', s: 'ใครเข้าแอปล่าสุดเมื่อไหร่', fn: "openActivity()" });
       }
       if (isBoss) items.push({ ico: 'fa-ranking-star', bg: 'var(--amber)', t: 'Leaderboard', s: 'อันดับคะแนน KPI', fn: "setPerfTab('rank'); switchTab('performance')" });
       items.push({ ico: 'fa-id-badge', bg: 'var(--primary-fg)', t: 'โปรไฟล์ของฉัน', s: (currentUser && currentUser.Email) || '', fn: "openProfile()" });
@@ -1355,6 +1368,30 @@
       items.push({ ico: 'fa-right-from-bracket', bg: 'var(--rose)', t: 'ออกจากระบบ', s: '', fn: "logout()" });
       document.getElementById('more-list').innerHTML = items.map(it =>
         `<div class="more-item" onclick="${it.fn}"><div class="mi-ico" style="background:${it.bg}"><i class="fa-solid ${it.ico}"></i></div><div style="flex-grow:1;"><h4>${it.t}</h4>${it.s ? `<p class="meta" style="margin:2px 0 0;">${it.s}</p>` : ''}</div><i class="fa-solid fa-chevron-right" style="color:var(--muted);"></i></div>`).join('');
+    }
+    function relTime(iso) {
+      if (!iso) return 'ยังไม่เคยเข้า';
+      const d = new Date(iso); if (isNaN(d)) return '-';
+      const s = Math.floor((Date.now() - d.getTime()) / 1000);
+      if (s < 60) return 'เมื่อสักครู่';
+      if (s < 3600) return Math.floor(s / 60) + ' นาทีที่แล้ว';
+      if (s < 86400) return Math.floor(s / 3600) + ' ชม.ที่แล้ว';
+      if (s < 604800) return Math.floor(s / 86400) + ' วันที่แล้ว';
+      return d.toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: '2-digit' }) + ' ' + d.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
+    }
+    function openActivity() {
+      const rows = appData.users.slice().sort((a, b) => {
+        const ta = a.LastLogin ? new Date(a.LastLogin).getTime() : 0;
+        const tb = b.LastLogin ? new Date(b.LastLogin).getTime() : 0;
+        return tb - ta;
+      });
+      document.getElementById('activity-list').innerHTML = rows.map(u => `
+        <div class="row" style="padding:11px 0; border-bottom:1px solid var(--border);">
+          ${avatarDiv(u)}
+          <div style="flex-grow:1;"><h4 style="margin:0; font-size:14.5px;">${u.Name || ''}</h4><p class="meta" style="margin:1px 0 0;">${u.Role || ''}${isActive(u) ? '' : ' · <span style="color:var(--rose-fg);">ปิดใช้งาน</span>'}</p></div>
+          <span style="font-size:12px; color:${u.LastLogin ? 'var(--primary-fg)' : 'var(--muted)'}; white-space:nowrap;">${relTime(u.LastLogin)}</span>
+        </div>`).join('') || emptyBox('ยังไม่มีข้อมูล', 'fa-user');
+      document.getElementById('modal-activity').classList.remove('hidden');
     }
 
     /* ---------- calendar ---------- */
@@ -1784,10 +1821,12 @@
     /* ---------- mock data (standalone preview) ---------- */
     function MOCK() {
       const f = d => { const x = new Date(); x.setDate(x.getDate()+d); return String(x.getDate()).padStart(2,'0')+'/'+String(x.getMonth()+1).padStart(2,'0')+'/'+x.getFullYear(); };
+      const nowISO = new Date().toISOString();
+      const agoISO = (h) => new Date(Date.now() - h * 3600000).toISOString();
       const users = [
-        { UserID:'U1', Name:'มุก', Role:'Project Coordinator', Email:'muk@apthai.com', Active:'TRUE' },
-        { UserID:'U2', Name:'พลอย', Role:'Sales Admin', Email:'ploy@apthai.com', Active:'TRUE' },
-        { UserID:'U3', Name:'เจมส์', Role:'Site Engineer', Email:'james@apthai.com', Active:'TRUE' }
+        { UserID:'U1', Name:'มุก', Role:'Project Coordinator', Email:'muk@apthai.com', Active:'TRUE', LastLogin: nowISO },
+        { UserID:'U2', Name:'พลอย', Role:'Sales Admin', Email:'ploy@apthai.com', Active:'TRUE', LastLogin: agoISO(5) },
+        { UserID:'U3', Name:'เจมส์', Role:'Site Engineer', Email:'james@apthai.com', Active:'TRUE', LastLogin: agoISO(50) }
       ];
       const tasks = [
         { TaskID:'T1', Project:'The City Sukkawat 3', Title:'ตรวจแบบห้องตัวอย่าง', Description:'ตรวจความเรียบร้อย ถ่ายรูปจุดที่ต้องแก้ให้ช่าง', AssigneeID:'U1', DueDate:f(1), Status:'กำลังทำ', Progress:60, Priority:'สูง',

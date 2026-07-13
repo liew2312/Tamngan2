@@ -18,7 +18,7 @@
   const pad = n => String(n).padStart(2, '0');
   function dbToDMY(d) { if (!d) return ''; const p = String(d).slice(0, 10).split('-'); return p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : ''; }
   function dmyToDb(s) { if (!s) return null; const p = String(s).split('/'); return p.length === 3 ? `${p[2]}-${pad(p[1])}-${pad(p[0])}` : null; }
-  function uUser(r) { return { UserID: r.id, Name: r.name, Role: r.role, Email: r.email || '', Color: r.color, IsBoss: r.is_boss ? 'TRUE' : '', Photo: r.photo || '', Status: r.status || '', Active: r.active === false ? 'FALSE' : 'TRUE' }; }
+  function uUser(r) { return { UserID: r.id, Name: r.name, Role: r.role, Email: r.email || '', Color: r.color, IsBoss: r.is_boss ? 'TRUE' : '', Photo: r.photo || '', Status: r.status || '', Active: r.active === false ? 'FALSE' : 'TRUE', LastLogin: r.last_login || '' }; }
   function uTask(r) { return { TaskID: r.id, Project: r.project || '', Title: r.title || '', Description: r.description || '', AssigneeID: r.assignee || '', DueDate: dbToDMY(r.due_date), Status: r.status || 'ยังไม่เริ่ม', Progress: parseInt(r.progress) || 0, Priority: r.priority || 'ปกติ', CompletedAt: r.completed_at || '', comments: [], dueLog: [] }; }
 
   /* ---------- Auth (อีเมล: กดลิงก์ หรือกรอกรหัส) ---------- */
@@ -131,6 +131,10 @@
       const id = await meId();
       const { data, error } = await SB.client.from('comments').insert({ task_id: a[0], author: id, message: a[1] }).select().single();
       if (error) throw error; return { UserID: id, Name: (SB.me && SB.me.Name) || '', Message: a[1], Timestamp: data.created_at };
+    },
+    touchActive: async () => {
+      try { const id = await meId(); await SB.client.from('app_users').update({ last_login: new Date().toISOString() }).eq('id', id); } catch (e) {}
+      return true;
     }
   };
 
