@@ -255,7 +255,6 @@
         <button class="chip" data-f="all" onclick="setFilter('all')"><i class="fa-solid fa-list"></i>ทั้งหมด</button>
       </div>
       <div style="padding: 8px 24px 0;" id="main-list"><p class="empty">กำลังโหลดข้อมูล…</p></div>
-      <div style="padding: 0 24px;" id="todo-wrap"></div>
     </div>
 
     <!-- 2. All tasks -->
@@ -270,18 +269,27 @@
           <button class="icon-btn boss-only" onclick="openTaskModal()" title="เพิ่มงาน"><i class="fa-solid fa-plus"></i></button>
         </div>
       </div>
-      <div class="search-wrap"><input id="task-search" placeholder="🔍 ค้นหางาน / โครงการ / ผู้รับผิดชอบ" oninput="renderTaskList()"></div>
-      <div class="filters" id="tfilters">
-        <button class="chip active" data-tf="all" onclick="setTaskFilter('all')"><i class="fa-solid fa-list"></i>ทั้งหมด</button>
-        <button class="chip" data-tf="mine" onclick="setTaskFilter('mine')"><i class="fa-solid fa-user"></i>ของฉัน</button>
-        <button class="chip" data-tf="review" onclick="setTaskFilter('review')"><i class="fa-solid fa-hourglass-half"></i>รอตรวจ</button>
-        <button class="chip" data-tf="overdue" onclick="setTaskFilter('overdue')"><i class="fa-solid fa-triangle-exclamation"></i>เลยกำหนด</button>
-        <button class="chip" data-tf="today" onclick="setTaskFilter('today')"><i class="fa-solid fa-bell"></i>ครบวันนี้</button>
-        <button class="chip" data-tf="week" onclick="setTaskFilter('week')"><i class="fa-solid fa-calendar-week"></i>ใน 7 วัน</button>
-        <button class="chip" data-tf="done" onclick="setTaskFilter('done')"><i class="fa-solid fa-circle-check"></i>เสร็จแล้ว</button>
+      <div class="filters" id="tabs-tasks">
+        <button class="chip active" data-tt="assigned" onclick="setTasksMode('assigned')"><i class="fa-solid fa-clipboard-list"></i>ได้รับมอบหมาย</button>
+        <button class="chip" data-tt="todo" onclick="setTasksMode('todo')"><i class="fa-solid fa-clipboard-check"></i>งานที่ต้องทำ</button>
       </div>
-      <div class="filters" id="tprojects"></div>
-      <div style="padding: 8px 24px 0;" id="tasks-list"></div>
+
+      <div id="tasks-assigned">
+        <div class="search-wrap"><input id="task-search" placeholder="🔍 ค้นหางาน / โครงการ / ผู้รับผิดชอบ" oninput="renderTaskList()"></div>
+        <div class="filters" id="tfilters">
+          <button class="chip active" data-tf="all" onclick="setTaskFilter('all')"><i class="fa-solid fa-list"></i>ทั้งหมด</button>
+          <button class="chip" data-tf="mine" onclick="setTaskFilter('mine')"><i class="fa-solid fa-user"></i>ของฉัน</button>
+          <button class="chip" data-tf="review" onclick="setTaskFilter('review')"><i class="fa-solid fa-hourglass-half"></i>รอตรวจ</button>
+          <button class="chip" data-tf="overdue" onclick="setTaskFilter('overdue')"><i class="fa-solid fa-triangle-exclamation"></i>เลยกำหนด</button>
+          <button class="chip" data-tf="today" onclick="setTaskFilter('today')"><i class="fa-solid fa-bell"></i>ครบวันนี้</button>
+          <button class="chip" data-tf="week" onclick="setTaskFilter('week')"><i class="fa-solid fa-calendar-week"></i>ใน 7 วัน</button>
+          <button class="chip" data-tf="done" onclick="setTaskFilter('done')"><i class="fa-solid fa-circle-check"></i>เสร็จแล้ว</button>
+        </div>
+        <div class="filters" id="tprojects"></div>
+        <div style="padding: 8px 24px 0;" id="tasks-list"></div>
+      </div>
+
+      <div id="tasks-todo" class="hidden" style="padding: 12px 24px 0;" ></div>
     </div>
 
     <!-- 3. Team -->
@@ -417,6 +425,23 @@
 
     <!-- ปุ่มเพิ่มงานแบบลอย (หัวหน้า) -->
     <button id="fab-add" class="fab hidden" onclick="openAddSheet()" title="เพิ่มงาน"><i class="fa-solid fa-plus"></i></button>
+  </div>
+
+  <!-- add/edit To-do modal -->
+  <div id="modal-todo" class="backdrop modal-wrap hidden" onclick="if(event.target===this)closeOverlay('modal-todo')">
+    <div class="modal">
+      <h3><i class="fa-solid fa-clipboard-check"></i><span id="td-title">เพิ่มสิ่งที่ต้องทำ</span></h3>
+      <div class="field"><label>รายการ *</label><input id="td-text" placeholder="เช่น ทำแอปให้เสร็จ"></div>
+      <div class="field"><label>ป้ายกำกับ</label><input id="td-tag" placeholder="เช่น เอกสาร, ไซต์งาน"></div>
+      <div class="field"><label>ความเร่งด่วน</label>
+        <select id="td-prio"><option value="สูง">สูง</option><option value="ปกติ" selected>ปกติ</option><option value="ต่ำ">ต่ำ</option></select>
+      </div>
+      <div class="field"><label>วันที่</label><input type="date" id="td-date"></div>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" onclick="closeOverlay('modal-todo')">ยกเลิก</button>
+        <button class="btn btn-primary" onclick="saveTodo()"><i class="fa-solid fa-check"></i> บันทึก</button>
+      </div>
+    </div>
   </div>
 
   <!-- toast แจ้งเตือน -->
@@ -949,7 +974,7 @@
       activeTab = tab;
       document.querySelectorAll('#nav button').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
       if (tab === 'home') { renderDashboard(); showScreen('screen-dashboard'); }
-      else if (tab === 'tasks') { renderTasks(); showScreen('screen-tasks'); }
+      else if (tab === 'tasks') { setTasksMode(tasksMode); showScreen('screen-tasks'); }
       else if (tab === 'calendar') { renderCalendar(); showScreen('screen-calendar'); }
       else if (tab === 'more') { renderMore(); showScreen('screen-more'); }
       else if (tab === 'team') { renderTeam(); showScreen('screen-team'); }
@@ -1011,36 +1036,82 @@
         }
       }
       document.getElementById('main-list').innerHTML = html;
-      renderTodos();
     }
 
-    /* ---------- To-do ส่วนตัว (เก็บในเครื่อง แยกตามผู้ใช้) ---------- */
+    /* ---------- To-do ส่วนตัว (เก็บในเครื่อง แยกตามผู้ใช้) แบบมีป้ายกำกับ/ความเร่งด่วน/วันที่ ---------- */
+    let tasksMode = 'assigned', editTodoIdx = -1;
     function escapeHtml(s) { return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
     function todoKey() { return 'tt_todos_' + (myUserId || sessionEmail || 'anon'); }
     function getTodos() { try { return JSON.parse(ssGet(todoKey()) || '[]'); } catch (e) { return []; } }
     function setTodos(a) { ssSet(todoKey(), JSON.stringify(a)); }
-    function renderTodos() {
-      const el = document.getElementById('todo-wrap'); if (!el) return;
-      const list = getTodos();
-      const rows = list.length ? list.map((t, i) => `
-        <div style="display:flex; align-items:center; gap:10px; padding:8px 0; border-bottom:1px solid var(--border);">
-          <i class="fa-${t.done ? 'solid' : 'regular'} fa-${t.done ? 'circle-check' : 'circle'}" style="color:${t.done ? 'var(--mint-fg)' : 'var(--muted)'}; cursor:pointer; font-size:18px;" onclick="toggleTodo(${i})"></i>
-          <span style="flex:1; font-size:13px; ${t.done ? 'text-decoration:line-through; color:var(--muted);' : ''}">${escapeHtml(t.text)}</span>
-          <i class="fa-solid fa-xmark" style="color:var(--muted); cursor:pointer; padding:4px;" onclick="delTodo(${i})"></i>
-        </div>`).join('') : '<p class="meta" style="text-align:center; padding:10px;">ยังไม่มีโน้ต เพิ่มสิ่งที่ต้องทำได้เลย</p>';
-      el.innerHTML = `
-        <div class="section-title" style="margin:18px 0 12px;"><i class="fa-solid fa-clipboard-check"></i>โน้ตงานของฉัน</div>
-        <div class="card">
-          <div style="display:flex; gap:8px;">
-            <input id="todo-input" placeholder="เพิ่มสิ่งที่ต้องทำ…" style="flex:1; border:1px solid var(--border); background:var(--bg); border-radius:10px; padding:10px 12px; font-family:inherit; font-size:13px; outline:none;" onkeydown="if(event.key==='Enter')addTodo()">
-            <button class="send-btn" style="width:40px; height:40px;" onclick="addTodo()"><i class="fa-solid fa-plus"></i></button>
+
+    function setTasksMode(m) {
+      tasksMode = m;
+      document.querySelectorAll('#tabs-tasks .chip').forEach(c => c.classList.toggle('active', c.dataset.tt === m));
+      document.getElementById('tasks-assigned').classList.toggle('hidden', m !== 'assigned');
+      document.getElementById('tasks-todo').classList.toggle('hidden', m !== 'todo');
+      if (m === 'assigned') renderTasks(); else renderTodos();
+    }
+    function todoDateLabel(d) {
+      const dt = parseDMY(d); if (!dt) return d || '';
+      return dt.toLocaleDateString('th-TH', { day: 'numeric', month: 'short' });
+    }
+    function todoRow(t, i) {
+      const pc = t.priority === 'สูง' ? 'var(--rose-fg)' : (t.priority === 'ต่ำ' ? 'var(--grey-fg)' : 'var(--primary)');
+      const dLeft = (t.date && !t.done) ? daysUntil({ DueDate: t.date }) : null;
+      const overdue = dLeft !== null && dLeft < 0;
+      return `<div style="display:flex; align-items:center; gap:12px; padding:12px 2px; border-bottom:1px solid var(--border);">
+          <i class="${t.done ? 'fa-solid fa-circle-check' : 'fa-regular fa-circle'}" style="font-size:21px; cursor:pointer; color:${t.done ? 'var(--mint-fg)' : pc};" onclick="toggleTodo(${i})"></i>
+          <div style="flex:1; min-width:0; cursor:pointer;" onclick="openTodoModal(${i})">
+            <div style="font-size:14.5px; ${t.done ? 'text-decoration:line-through; color:var(--muted);' : ''}">${escapeHtml(t.text)}</div>
+            ${t.tag ? `<span class="badge b-todo" style="font-size:10px; margin-top:4px;"><i class="fa-solid fa-tag"></i>${escapeHtml(t.tag)}</span>` : ''}
           </div>
-          <div style="margin-top:6px;">${rows}</div>
+          ${t.date ? `<span style="font-size:12.5px; white-space:nowrap; color:${overdue ? 'var(--rose-fg)' : 'var(--primary-fg)'};">${todoDateLabel(t.date)}</span>` : ''}
+          <i class="fa-solid fa-xmark" style="color:var(--muted); cursor:pointer; padding:4px;" onclick="event.stopPropagation(); delTodo(${i})"></i>
         </div>`;
     }
-    function addTodo() { const inp = document.getElementById('todo-input'); const v = (inp.value || '').trim(); if (!v) return; const list = getTodos(); list.push({ text: v, done: false }); setTodos(list); renderTodos(); }
+    function renderTodos() {
+      const el = document.getElementById('tasks-todo'); if (!el) return;
+      const list = getTodos().slice().sort((a, b) => {
+        if (!!a.done !== !!b.done) return a.done ? 1 : -1;                 // ยังไม่เสร็จก่อน
+        const da = parseDMY(a.date), db = parseDMY(b.date);
+        if (da && db) return da - db; if (da) return -1; if (db) return 1; return 0;
+      });
+      // แม็ปกลับไปยัง index จริงใน storage
+      const raw = getTodos();
+      const idxOf = t => raw.indexOf(t);
+      el.innerHTML =
+        `<button class="btn btn-primary" style="width:100%; margin-bottom:14px;" onclick="openTodoModal()"><i class="fa-solid fa-plus"></i> เพิ่มสิ่งที่ต้องทำ</button>` +
+        (list.length
+          ? `<div class="card" style="padding:4px 14px;">${list.map(t => todoRow(t, idxOf(t))).join('')}</div>`
+          : emptyBox('ยังไม่มีรายการ เพิ่มสิ่งที่ต้องทำได้เลย', 'fa-clipboard-check'));
+    }
     function toggleTodo(i) { const list = getTodos(); if (list[i]) { list[i].done = !list[i].done; setTodos(list); renderTodos(); } }
-    function delTodo(i) { const list = getTodos(); list.splice(i, 1); setTodos(list); renderTodos(); }
+    function delTodo(i) { if (!confirm('ลบรายการนี้?')) return; const list = getTodos(); list.splice(i, 1); setTodos(list); renderTodos(); }
+    function openTodoModal(i) {
+      editTodoIdx = (typeof i === 'number') ? i : -1;
+      const t = editTodoIdx >= 0 ? getTodos()[editTodoIdx] : { text: '', tag: '', priority: 'ปกติ', date: '' };
+      document.getElementById('td-title').innerText = editTodoIdx >= 0 ? 'แก้ไขสิ่งที่ต้องทำ' : 'เพิ่มสิ่งที่ต้องทำ';
+      document.getElementById('td-text').value = t.text || '';
+      document.getElementById('td-tag').value = t.tag || '';
+      document.getElementById('td-prio').value = t.priority || 'ปกติ';
+      document.getElementById('td-date').value = toISO(t.date);
+      document.getElementById('modal-todo').classList.remove('hidden');
+    }
+    function saveTodo() {
+      const text = document.getElementById('td-text').value.trim();
+      if (!text) { alert('กรุณากรอกรายการ'); return; }
+      const rec = {
+        text: text,
+        tag: document.getElementById('td-tag').value.trim(),
+        priority: document.getElementById('td-prio').value,
+        date: toDMY(document.getElementById('td-date').value),
+        done: editTodoIdx >= 0 ? !!getTodos()[editTodoIdx].done : false
+      };
+      const list = getTodos();
+      if (editTodoIdx >= 0) list[editTodoIdx] = rec; else list.push(rec);
+      setTodos(list); closeOverlay('modal-todo'); renderTodos();
+    }
 
     /* ---------- summary page (หัวหน้า) ---------- */
     function renderSummary() {
