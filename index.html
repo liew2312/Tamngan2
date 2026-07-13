@@ -606,7 +606,7 @@
     }
 
     /* ---------- แจ้งเตือน "งานรอตรวจ" (หัวหน้า) ---------- */
-    let reviewSeen = null, reviewInit = false, pollTimer = null, toastTimer = null, toastCb = null;
+    let reviewSeen = null, assignSeen = null, reviewInit = false, pollTimer = null, toastTimer = null, toastCb = null;
     function showToast(msg, cb) {
       const el = document.getElementById('toast');
       document.getElementById('toast-msg').innerText = msg; toastCb = cb || null;
@@ -622,24 +622,40 @@
       if (isBoss && n > 0) { b.innerText = n > 9 ? '9+' : n; b.classList.remove('hidden'); } else b.classList.add('hidden');
     }
     function checkReviewNotify() {
-      if (!isBoss) { updateReviewBadge(0); return; }
-      const pending = appData.tasks.filter(t => t.Status === 'รอตรวจ');
-      const ids = pending.map(t => t.TaskID);
-      updateReviewBadge(ids.length);
-      if (!reviewInit) { reviewSeen = new Set(ids); reviewInit = true; return; } // baseline ตอนเข้าครั้งแรก ไม่เด้ง
-      const fresh = ids.filter(id => !reviewSeen.has(id));
-      if (fresh.length) {
-        const t0 = pending.find(t => t.TaskID === fresh[0]);
-        const msg = fresh.length === 1
-          ? `${(t0 && t0.AssigneeName) || 'ลูกน้อง'} ส่งงาน “${t0 && t0.Title}” ให้ตรวจ`
-          : `มี ${fresh.length} งานถูกส่งมาให้ตรวจ`;
-        showToast(msg, () => { setTaskFilter('review'); switchTab('tasks'); });
-        notify('มีงานรอตรวจ', msg);
+      if (isBoss) {
+        // หัวหน้า: เด้งเมื่อมีงานถูกส่งมาให้ตรวจ (รอตรวจ)
+        const pending = appData.tasks.filter(t => t.Status === 'รอตรวจ');
+        const ids = pending.map(t => t.TaskID);
+        updateReviewBadge(ids.length);
+        if (!reviewInit) { reviewSeen = new Set(ids); reviewInit = true; return; }
+        const fresh = ids.filter(id => !reviewSeen.has(id));
+        if (fresh.length) {
+          const t0 = pending.find(t => t.TaskID === fresh[0]);
+          const msg = fresh.length === 1
+            ? `${(t0 && t0.AssigneeName) || 'ลูกน้อง'} ส่งงาน “${t0 && t0.Title}” ให้ตรวจ`
+            : `มี ${fresh.length} งานถูกส่งมาให้ตรวจ`;
+          showToast(msg, () => { setTaskFilter('review'); switchTab('tasks'); });
+          notify('มีงานรอตรวจ', msg);
+        }
+        reviewSeen = new Set(ids);
+      } else {
+        // พนักงาน: เด้งเมื่อได้รับมอบหมายงานใหม่
+        updateReviewBadge(0);
+        const mine = appData.tasks.filter(t => t.AssigneeID === myUserId && !isClosed(t));
+        const ids = mine.map(t => t.TaskID);
+        if (assignSeen === null) { assignSeen = new Set(ids); return; } // baseline
+        const fresh = ids.filter(id => !assignSeen.has(id));
+        if (fresh.length) {
+          const t0 = mine.find(t => t.TaskID === fresh[0]);
+          const msg = fresh.length === 1 ? `คุณได้รับงานใหม่: “${t0 && t0.Title}”` : `คุณได้รับงานใหม่ ${fresh.length} งาน`;
+          showToast('📋 ' + msg, () => { switchTab('tasks'); });
+          notify('งานใหม่', msg);
+        }
+        assignSeen = new Set(ids);
       }
-      reviewSeen = new Set(ids);
     }
     function maybeAskNotif() {
-      try { if (isBoss && window.Notification && Notification.permission === 'default') Notification.requestPermission(); } catch (e) {}
+      try { if (myUserId && window.Notification && Notification.permission === 'default') Notification.requestPermission(); } catch (e) {}
     }
     function startReviewPoll() {
       if (pollTimer) return;
@@ -762,7 +778,7 @@
         activeTab = 'home'; switchTab('home');
         maybeAskNotif();
         if (SB_MODE()) { window.SB.subscribe(() => reloadData()); } // realtime: อัปเดตทันที
-        else { startReviewPoll(); }
+        startReviewPoll(); // สำรอง: ดึงซ้ำทุก 60 วิ เผื่อ realtime ไม่ถึง
       };
       callServer('fetchAppData', [sessionEmail]).then(render)
         .catch(e => { showLogin(); document.getElementById('login-err').innerText = (e && e.message) || 'โหลดข้อมูลไม่สำเร็จ'; });

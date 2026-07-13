@@ -58,13 +58,15 @@ create index if not exists idx_duelog_task on due_log(task_id);
 -- ---------- ฟังก์ชันช่วย (SECURITY DEFINER เพื่อเลี่ยง RLS วนซ้ำ) ----------
 create or replace function me_id() returns uuid
   language sql security definer stable as $$
-  select id from app_users where email = (auth.jwt() ->> 'email') limit 1
+  select id from app_users where lower(email) = lower(auth.email()) limit 1
 $$;
 
 create or replace function is_boss() returns boolean
   language sql security definer stable as $$
-  select coalesce((select is_boss from app_users
-                   where email = (auth.jwt() ->> 'email') limit 1), false)
+  select coalesce(
+           (select is_boss from app_users where lower(email) = lower(auth.email()) limit 1),
+           false)
+         or lower(coalesce(auth.email(), '')) in ('lewclassic@gmail.com')  -- อีเมลหัวหน้า (เพิ่มได้)
 $$;
 
 -- ---------- เปิด RLS ----------
