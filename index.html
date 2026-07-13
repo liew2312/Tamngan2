@@ -1076,7 +1076,7 @@
     }
     function mCardDown(e, card) {
       const sx = e.clientX, sy = e.clientY;
-      mOrderLp = setTimeout(() => mBeginDrag(card), 350);
+      mOrderLp = setTimeout(() => mBeginDrag(card), 2000); // ต้องกดค้าง 2 วินาที
       const mv = (ev) => { if (!mDragging && Math.hypot(ev.clientX - sx, ev.clientY - sy) > 12) cleanup(); };
       const up = () => cleanup();
       function cleanup() { clearTimeout(mOrderLp); document.removeEventListener('pointermove', mv); document.removeEventListener('pointerup', up); }
