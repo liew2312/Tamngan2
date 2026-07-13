@@ -139,10 +139,10 @@
     .chip.active { background: var(--primary); color: #fff; border-color: var(--primary); box-shadow: var(--shadow); }
 
     /* สลับโหมดในหน้างาน (ได้รับมอบหมาย / งานที่ต้องทำ) — ใหญ่ + สีชัด */
-    #tabs-tasks { gap: 10px; padding: 14px 24px 6px; }
-    #tabs-tasks .chip { flex: 1; justify-content: center; padding: 13px 8px; font-size: 14px; font-weight: 600; border-radius: 14px; border: none; }
-    #tabs-tasks .chip:not(.active) { background: var(--primary-soft); color: var(--primary-fg); }
-    #tabs-tasks .chip.active { background: var(--primary); color: #fff; box-shadow: 0 4px 12px rgba(91,130,224,.4); }
+    #tabs-tasks, #home-toggle { gap: 10px; padding: 14px 24px 6px; }
+    #tabs-tasks .chip, #home-toggle .chip { flex: 1; justify-content: center; padding: 13px 8px; font-size: 14px; font-weight: 600; border-radius: 14px; border: none; }
+    #tabs-tasks .chip:not(.active), #home-toggle .chip:not(.active) { background: var(--primary-soft); color: var(--primary-fg); }
+    #tabs-tasks .chip.active, #home-toggle .chip.active { background: var(--primary); color: #fff; box-shadow: 0 4px 12px rgba(91,130,224,.4); }
 
     /* progress */
     .prog-bg { width: 100%; height: 8px; background: #e6eaf2; border-radius: 999px; overflow: hidden; margin: 10px 0 0; }
@@ -284,6 +284,10 @@
           <button id="bell-btn" class="icon-btn" onclick="openNotifs()" title="การแจ้งเตือน" style="position:relative;"><i class="fa-solid fa-bell"></i><span id="bell-badge" class="bell-badge hidden">0</span></button>
           <div class="avatar" id="me-avatar" style="background:var(--primary);" onclick="openProfile()" title="โปรไฟล์ของฉัน">W</div>
         </div>
+      </div>
+      <div class="filters boss-only hidden" id="home-toggle">
+        <button class="chip active" data-hv="team" onclick="setHomeView('team')"><i class="fa-solid fa-users"></i>ภาพรวมทีม</button>
+        <button class="chip" data-hv="me" onclick="setHomeView('me')"><i class="fa-solid fa-user"></i>งานของฉัน</button>
       </div>
       <div id="dash-progress" class="hidden" style="padding:0 24px;"></div>
       <div class="stats-grid">
@@ -1092,6 +1096,8 @@
       renderDashboard();
     }
     function scopeTasks() { return isBoss ? appData.tasks : appData.tasks.filter(t => t.AssigneeID === myUserId); }
+    let bossHomeView = 'team';
+    function setHomeView(v) { bossHomeView = v; renderDashboard(); window.scrollTo(0, 0); }
     function renderDashboard() {
       const scope = scopeTasks();
       document.getElementById('st-overdue').innerText = scope.filter(t => matchFilter(t, 'overdue')).length;
@@ -1114,7 +1120,24 @@
         return;
       }
 
-      // ===== หัวหน้า (คงเดิม) =====
+      // ===== หัวหน้า =====
+      const toggleEl = document.getElementById('home-toggle');
+      if (toggleEl) { toggleEl.classList.remove('hidden'); toggleEl.querySelectorAll('.chip').forEach(c => c.classList.toggle('active', c.dataset.hv === bossHomeView)); }
+
+      // มุมมอง "งานของฉัน" (ดีไซน์วันนี้ เหมือนลูกทีม แต่เป็นงานของหัวหน้าเอง)
+      if (bossHomeView === 'me') {
+        if (statsEl) statsEl.classList.add('hidden');
+        if (filtersEl) filtersEl.classList.add('hidden');
+        if (progEl) progEl.classList.remove('hidden');
+        if (dateEl) dateEl.classList.remove('hidden');
+        renderMemberHome();
+        updateBell();
+        return;
+      }
+
+      // มุมมองทีม — คืนหัวข้อ/การแสดงผล
+      const gT = document.querySelector('#screen-dashboard .greeting'); if (gT) gT.innerHTML = '<i class="fa-solid fa-layer-group"></i>ภาพรวมทีม';
+      const tT = document.querySelector('#screen-dashboard h1.title'); if (tT) tT.innerText = 'งานของทีม';
       if (statsEl) statsEl.classList.remove('hidden');
       if (filtersEl) filtersEl.classList.remove('hidden');
       if (progEl) progEl.classList.add('hidden');
