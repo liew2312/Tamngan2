@@ -207,6 +207,20 @@
     .toast { position: fixed; left: 50%; transform: translateX(-50%) translateY(-16px); bottom: 90px; max-width: 400px; width: calc(100% - 32px); background: #2b3142; color: #fff; border-radius: 14px; padding: 13px 16px; font-size: 13px; box-shadow: var(--shadow-lg); z-index: 60; display: flex; align-items: center; gap: 10px; opacity: 0; transition: opacity .25s, transform .25s; pointer-events: none; }
     .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); pointer-events: auto; cursor: pointer; }
     .toast i { color: #ffd27a; font-size: 16px; }
+    .toast.ok { background: #1f8a5b; }
+    .toast.ok i { color: #eafff4; }
+
+    /* skeleton loading */
+    .skel { background: var(--card); border-radius: 14px; padding: 14px; margin-bottom: 10px; box-shadow: var(--shadow); }
+    .skel-line { height: 12px; border-radius: 6px; background: linear-gradient(90deg,#eef1f6 25%,#e2e7f0 37%,#eef1f6 63%); background-size: 400% 100%; animation: shimmer 1.3s ease infinite; }
+    @keyframes shimmer { 0% { background-position: 100% 0; } 100% { background-position: 0 0; } }
+
+    /* หน้าจอชิปกรอง: ไล่จางขอบขวาเป็นสัญญาณว่าเลื่อนได้ */
+    .filters { -webkit-mask-image: linear-gradient(to right, #000 88%, transparent); mask-image: linear-gradient(to right, #000 88%, transparent); }
+
+    /* pull-to-refresh */
+    #ptr { position: fixed; top: 8px; left: 50%; transform: translateX(-50%) scale(.8); width: 38px; height: 38px; border-radius: 50%; background: var(--card); box-shadow: var(--shadow-lg); display: flex; align-items: center; justify-content: center; color: var(--primary-fg); z-index: 55; opacity: 0; transition: opacity .15s, transform .15s; pointer-events: none; }
+    #ptr.show { opacity: 1; transform: translateX(-50%) scale(1); }
 
     /* overlays: action sheet + modal */
     .backdrop { position: fixed; inset: 0; background: rgba(40,49,66,.42); z-index: 40; display: flex; align-items: flex-end; justify-content: center; }
@@ -284,7 +298,11 @@
         <button class="chip" data-f="week" onclick="setFilter('week')"><i class="fa-solid fa-calendar-week"></i>ใน 7 วัน</button>
         <button class="chip" data-f="all" onclick="setFilter('all')"><i class="fa-solid fa-list"></i>ทั้งหมด</button>
       </div>
-      <div style="padding: 8px 24px 0;" id="main-list"><p class="empty">กำลังโหลดข้อมูล…</p></div>
+      <div style="padding: 8px 24px 0;" id="main-list">
+        <div class="skel"><div class="skel-line" style="width:55%;"></div><div class="skel-line" style="width:80%; margin-top:10px;"></div></div>
+        <div class="skel"><div class="skel-line" style="width:45%;"></div><div class="skel-line" style="width:75%; margin-top:10px;"></div></div>
+        <div class="skel"><div class="skel-line" style="width:50%;"></div><div class="skel-line" style="width:70%; margin-top:10px;"></div></div>
+      </div>
     </div>
 
     <!-- 2. All tasks -->
@@ -486,7 +504,8 @@
   </div>
 
   <!-- toast แจ้งเตือน -->
-  <div id="toast" class="toast" onclick="toastAction()"><i class="fa-solid fa-bell"></i><span id="toast-msg"></span></div>
+  <div id="ptr"><i class="fa-solid fa-arrows-rotate"></i></div>
+  <div id="toast" class="toast" onclick="toastAction()"><i id="toast-ico" class="fa-solid fa-bell"></i><span id="toast-msg"></span></div>
 
   <!-- action sheet -->
   <div id="sheet" class="backdrop hidden" onclick="if(event.target===this)closeOverlay('sheet')">
@@ -649,12 +668,15 @@
 
     /* ---------- แจ้งเตือน "งานรอตรวจ" (หัวหน้า) ---------- */
     let reviewSeen = null, assignSeen = null, reviewInit = false, pollTimer = null, toastTimer = null, toastCb = null;
-    function showToast(msg, cb) {
+    function showToast(msg, cb, ok) {
       const el = document.getElementById('toast');
       document.getElementById('toast-msg').innerText = msg; toastCb = cb || null;
+      el.classList.toggle('ok', !!ok);
+      document.getElementById('toast-ico').className = 'fa-solid ' + (ok ? 'fa-circle-check' : 'fa-bell');
       el.classList.add('show'); clearTimeout(toastTimer);
-      toastTimer = setTimeout(() => el.classList.remove('show'), 6000);
+      toastTimer = setTimeout(() => el.classList.remove('show'), ok ? 2500 : 6000);
     }
+    function toastOk(msg) { showToast(msg, null, true); }
     function toastAction() { document.getElementById('toast').classList.remove('show'); if (toastCb) toastCb(); }
     function notify(title, body) {
       try { if (window.Notification && Notification.permission === 'granted') new Notification(title, { body: body, icon: 'icon.svg' }); } catch (e) {}
@@ -1741,6 +1763,8 @@
         const s = statusMeta(currentTask); const badge = document.getElementById('t-badge');
         badge.className = 'badge ' + s.cls; badge.innerHTML = `<i class="fa-solid ${s.icon}"></i>${s.label}`;
         renderActions(); renderAll();
+        const okMsg = status === 'เสร็จแล้ว' ? 'อนุมัติงานแล้ว' : status === 'รอตรวจ' ? 'ส่งงานให้หัวหน้าตรวจแล้ว' : status === 'ยกเลิก' ? 'ยกเลิกงานแล้ว' : 'อัปเดตสถานะแล้ว';
+        toastOk(okMsg);
       });
     }
     function renderDueLog() {
@@ -1851,6 +1875,7 @@
         renderAll();
         closeOverlay('modal-task');
         switchTab('tasks');
+        toastOk('บันทึกงานแล้ว');
       });
     }
 
@@ -1917,6 +1942,7 @@
         renderAll();
         closeOverlay('modal-member');
         switchTab('team');
+        toastOk('เพิ่มสมาชิกแล้ว');
       });
     }
 
@@ -2005,6 +2031,7 @@
         setAvatarEl(document.getElementById('me-avatar'), currentUser);
         renderAll();
         closeOverlay('modal-profile');
+        toastOk('บันทึกโปรไฟล์แล้ว');
       });
     }
 
@@ -2029,6 +2056,30 @@
       const currentUser = { UserID:'U1', Name:'มุก', Role:'Project Coordinator', Email:'muk@apthai.com', isBoss:true, registered:true };
       return { users, tasks, currentUser };
     }
+
+    /* ---------- pull-to-refresh (ลากลงเพื่อรีเฟรช) ---------- */
+    (function initPTR() {
+      let startY = 0, pulling = false, ready = false;
+      const ptr = () => document.getElementById('ptr');
+      const scr = () => (document.scrollingElement || document.documentElement);
+      document.addEventListener('touchstart', e => {
+        if (scr().scrollTop > 0) return;
+        if (!document.getElementById('screen-login').classList.contains('hidden')) return; // ไม่ทำงานหน้า login
+        if (!document.getElementById('screen-task').classList.contains('hidden')) return;   // และหน้ารายละเอียดงาน
+        startY = e.touches[0].clientY; pulling = true; ready = false;
+      }, { passive: true });
+      document.addEventListener('touchmove', e => {
+        if (!pulling) return;
+        const dy = e.touches[0].clientY - startY;
+        if (dy > 0) { const p = ptr(); if (p) { p.classList.add('show'); ready = dy > 70; p.style.transform = 'translateX(-50%) rotate(' + Math.min(dy * 2, 200) + 'deg)'; } }
+      }, { passive: true });
+      document.addEventListener('touchend', () => {
+        if (!pulling) return; pulling = false;
+        const p = ptr(); if (!p) return;
+        if (ready) { reloadData(); setTimeout(() => { p.classList.remove('show'); p.style.transform = ''; }, 800); }
+        else { p.classList.remove('show'); p.style.transform = ''; }
+      });
+    })();
 
     /* ---------- PWA service worker ---------- */
     if ('serviceWorker' in navigator && location.protocol.indexOf('http') === 0) {
