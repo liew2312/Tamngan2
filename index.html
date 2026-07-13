@@ -171,6 +171,8 @@
     .nav button.active { color: var(--primary); }
     .nav button.add-btn i { background: var(--primary); color: #fff; width: 40px; height: 40px; border-radius: 14px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(91,130,224,.45); margin-top: -18px; }
     .nav button.add-btn { color: var(--primary-fg); font-weight: 600; }
+    .fab { position: fixed; right: 18px; bottom: calc(78px + env(safe-area-inset-bottom)); width: 56px; height: 56px; border-radius: 50%; background: var(--primary); color: #fff; border: none; font-size: 22px; box-shadow: 0 6px 18px rgba(91,130,224,.5); cursor: pointer; z-index: 26; display: flex; align-items: center; justify-content: center; transition: transform .15s; }
+    .fab:active { transform: scale(.9); }
     .nav-badge { position: absolute; top: 2px; left: 54%; background: var(--rose); color: #fff; font-size: 9.5px; font-weight: 700; min-width: 16px; height: 16px; border-radius: 999px; display: flex; align-items: center; justify-content: center; padding: 0 4px; box-shadow: 0 1px 3px rgba(0,0,0,.2); }
 
     /* toast */
@@ -253,6 +255,7 @@
         <button class="chip" data-f="all" onclick="setFilter('all')"><i class="fa-solid fa-list"></i>ทั้งหมด</button>
       </div>
       <div style="padding: 8px 24px 0;" id="main-list"><p class="empty">กำลังโหลดข้อมูล…</p></div>
+      <div style="padding: 0 24px;" id="todo-wrap"></div>
     </div>
 
     <!-- 2. All tasks -->
@@ -408,10 +411,12 @@
     <div class="nav" id="nav">
       <button data-tab="home" class="active" onclick="switchTab('home')"><i class="fa-solid fa-house"></i>หน้าหลัก</button>
       <button data-tab="tasks" onclick="switchTab('tasks')"><span class="nav-badge hidden" id="nav-review-badge">0</span><i class="fa-solid fa-list-check"></i>งาน</button>
-      <button data-tab="add" class="add-btn boss-only" onclick="openAddSheet()"><i class="fa-solid fa-plus"></i>เพิ่ม</button>
       <button data-tab="calendar" onclick="switchTab('calendar')"><i class="fa-solid fa-calendar-days"></i>ปฏิทิน</button>
       <button data-tab="more" onclick="switchTab('more')"><i class="fa-solid fa-ellipsis"></i>เพิ่มเติม</button>
     </div>
+
+    <!-- ปุ่มเพิ่มงานแบบลอย (หัวหน้า) -->
+    <button id="fab-add" class="fab hidden" onclick="openAddSheet()" title="เพิ่มงาน"><i class="fa-solid fa-plus"></i></button>
   </div>
 
   <!-- toast แจ้งเตือน -->
@@ -668,6 +673,7 @@
     function showLogin() {
       document.querySelectorAll('.screen').forEach(s => s.classList.add('hidden'));
       document.getElementById('nav').classList.add('hidden');
+      const fab = document.getElementById('fab-add'); if (fab) fab.classList.add('hidden');
       document.getElementById('screen-login').classList.remove('hidden');
       otpStage = false;
       document.getElementById('otp-wrap').classList.add('hidden');
@@ -955,6 +961,9 @@
       document.getElementById(id).classList.remove('hidden');
       // ซ่อน bottom nav บนหน้ารายละเอียดงาน (มีช่องแชทอยู่ล่างสุด)
       document.getElementById('nav').classList.toggle('hidden', id === 'screen-task');
+      // ปุ่มลอยเพิ่มงาน: โชว์เฉพาะหัวหน้า และไม่โชว์บนหน้ารายละเอียดงาน
+      const fab = document.getElementById('fab-add');
+      if (fab) fab.classList.toggle('hidden', !(isBoss && id !== 'screen-task'));
       window.scrollTo(0, 0);
     }
     function goBack(target) {
@@ -1002,7 +1011,37 @@
         }
       }
       document.getElementById('main-list').innerHTML = html;
+      renderTodos();
     }
+
+    /* ---------- To-do ส่วนตัว (เก็บในเครื่อง แยกตามผู้ใช้) ---------- */
+    function escapeHtml(s) { return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+    function todoKey() { return 'tt_todos_' + (myUserId || sessionEmail || 'anon'); }
+    function getTodos() { try { return JSON.parse(ssGet(todoKey()) || '[]'); } catch (e) { return []; } }
+    function setTodos(a) { ssSet(todoKey(), JSON.stringify(a)); }
+    function renderTodos() {
+      const el = document.getElementById('todo-wrap'); if (!el) return;
+      const list = getTodos();
+      const rows = list.length ? list.map((t, i) => `
+        <div style="display:flex; align-items:center; gap:10px; padding:8px 0; border-bottom:1px solid var(--border);">
+          <i class="fa-${t.done ? 'solid' : 'regular'} fa-${t.done ? 'circle-check' : 'circle'}" style="color:${t.done ? 'var(--mint-fg)' : 'var(--muted)'}; cursor:pointer; font-size:18px;" onclick="toggleTodo(${i})"></i>
+          <span style="flex:1; font-size:13px; ${t.done ? 'text-decoration:line-through; color:var(--muted);' : ''}">${escapeHtml(t.text)}</span>
+          <i class="fa-solid fa-xmark" style="color:var(--muted); cursor:pointer; padding:4px;" onclick="delTodo(${i})"></i>
+        </div>`).join('') : '<p class="meta" style="text-align:center; padding:10px;">ยังไม่มีโน้ต เพิ่มสิ่งที่ต้องทำได้เลย</p>';
+      el.innerHTML = `
+        <div class="section-title" style="margin:18px 0 12px;"><i class="fa-solid fa-clipboard-check"></i>โน้ตงานของฉัน</div>
+        <div class="card">
+          <div style="display:flex; gap:8px;">
+            <input id="todo-input" placeholder="เพิ่มสิ่งที่ต้องทำ…" style="flex:1; border:1px solid var(--border); background:var(--bg); border-radius:10px; padding:10px 12px; font-family:inherit; font-size:13px; outline:none;" onkeydown="if(event.key==='Enter')addTodo()">
+            <button class="send-btn" style="width:40px; height:40px;" onclick="addTodo()"><i class="fa-solid fa-plus"></i></button>
+          </div>
+          <div style="margin-top:6px;">${rows}</div>
+        </div>`;
+    }
+    function addTodo() { const inp = document.getElementById('todo-input'); const v = (inp.value || '').trim(); if (!v) return; const list = getTodos(); list.push({ text: v, done: false }); setTodos(list); renderTodos(); }
+    function toggleTodo(i) { const list = getTodos(); if (list[i]) { list[i].done = !list[i].done; setTodos(list); renderTodos(); } }
+    function delTodo(i) { const list = getTodos(); list.splice(i, 1); setTodos(list); renderTodos(); }
+
     /* ---------- summary page (หัวหน้า) ---------- */
     function renderSummary() {
       const all = appData.tasks.filter(t => !isCancelled(t));
