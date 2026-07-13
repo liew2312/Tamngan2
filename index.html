@@ -141,9 +141,11 @@
     .b-todo { background: var(--grey-soft); color: var(--grey-fg); }
 
     .row { display: flex; align-items: center; gap: 13px; }
-    .task-item { background: var(--card); border-radius: 16px; padding: 14px; margin-bottom: 12px; box-shadow: var(--shadow); cursor: pointer; border-left: 4px solid var(--grey-soft); transition: transform .15s; }
+    .task-item { background: var(--card); border-radius: 13px; padding: 10px 12px; margin-bottom: 8px; box-shadow: var(--shadow); cursor: pointer; border-left: 4px solid var(--grey-soft); transition: transform .15s; }
     .task-item:active { transform: scale(.98); }
-    .task-item h4 { margin: 0; font-size: 14.5px; font-weight: 600; }
+    .task-item h4 { margin: 0; font-size: 13.5px; font-weight: 600; }
+    .task-item .prog-bg { height: 5px; margin-top: 7px; }
+    .task-item .meta { font-size: 11px; }
     .meta { font-size: 11.5px; color: var(--muted); }
     .meta i { margin: 0 3px 0 0; }
     .empty { text-align: center; color: var(--muted); font-size: 13px; padding: 46px 20px; }
@@ -421,7 +423,7 @@
     <!-- bottom nav -->
     <div class="nav" id="nav">
       <button data-tab="home" class="active" onclick="switchTab('home')"><i class="fa-solid fa-house"></i>หน้าหลัก</button>
-      <button data-tab="tasks" onclick="switchTab('tasks')"><span class="nav-badge hidden" id="nav-review-badge">0</span><i class="fa-solid fa-list-check"></i>งาน</button>
+      <button data-tab="tasks" onclick="switchTab('tasks')"><i class="fa-solid fa-list-check"></i>งาน</button>
       <button data-tab="calendar" onclick="switchTab('calendar')"><i class="fa-solid fa-calendar-days"></i>ปฏิทิน</button>
       <button data-tab="more" onclick="switchTab('more')"><i class="fa-solid fa-ellipsis"></i>เพิ่มเติม</button>
     </div>
@@ -1519,9 +1521,15 @@
       document.getElementById('u-name').innerText = viewUser.Name || '';
       document.getElementById('u-role').innerHTML = (viewUser.Role || '') + (viewUser.Status ? ' · <span style="color:var(--primary-fg);">' + viewUser.Status + '</span>' : '');
       document.getElementById('u-kpi').innerHTML = isBoss ? kpiCardHtml(userId) : '';
-      const my = appData.tasks.filter(t => t.AssigneeID === userId);
-      document.getElementById('u-task-list').innerHTML =
-        my.length ? my.map(t => taskCard(t, false, 'user')).join('') : emptyBox('ยังไม่มีงานที่ได้รับมอบหมาย', 'fa-clipboard');
+      const my = appData.tasks.filter(t => t.AssigneeID === userId && !isCancelled(t));
+      const active = my.filter(t => !isDone(t));
+      const done = my.filter(isDone);
+      let h = active.length ? active.map(t => taskCard(t, false, 'user')).join('') : emptyBox('ไม่มีงานค้าง 🎉', 'fa-circle-check');
+      if (done.length) {
+        h += `<div class="section-title" style="margin:18px 0 10px;"><i class="fa-solid fa-clock-rotate-left" style="color:var(--mint-fg);"></i>ประวัติงานที่เสร็จแล้ว (${done.length})</div>`;
+        h += done.map(t => taskCard(t, false, 'user')).join('');
+      }
+      document.getElementById('u-task-list').innerHTML = h;
       showScreen('screen-user');
     }
     function kpiCardHtml(userId) {
