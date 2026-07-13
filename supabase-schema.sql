@@ -79,12 +79,12 @@ alter table due_log   enable row level security;
 -- app_users: หัวหน้าเห็นทุกคน / พนักงานเห็นเฉพาะตัวเอง
 drop policy if exists u_sel on app_users;
 create policy u_sel on app_users for select
-  using ( is_boss() or email = (auth.jwt() ->> 'email') );
+  using ( is_boss() or lower(email) = lower(auth.email()) );
 drop policy if exists u_ins on app_users;
 create policy u_ins on app_users for insert with check ( is_boss() );
 drop policy if exists u_upd on app_users;
 create policy u_upd on app_users for update
-  using ( is_boss() or email = (auth.jwt() ->> 'email') );
+  using ( is_boss() or lower(email) = lower(auth.email()) );
 drop policy if exists u_del on app_users;
 create policy u_del on app_users for delete using ( is_boss() );
 
