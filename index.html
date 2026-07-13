@@ -177,6 +177,10 @@
     .nav button.active { color: var(--primary); }
     .nav button.add-btn i { background: var(--primary); color: #fff; width: 40px; height: 40px; border-radius: 14px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(91,130,224,.45); margin-top: -18px; }
     .nav button.add-btn { color: var(--primary-fg); font-weight: 600; }
+    .member-card { touch-action: pan-y; }
+    .member-card.dragging { opacity: .96; transform: scale(1.03); box-shadow: var(--shadow-lg); position: relative; z-index: 5; }
+    .reordering .member-card { touch-action: none; }
+    .drag-grip { cursor: grab; }
     .fab { position: fixed; right: 18px; bottom: calc(78px + env(safe-area-inset-bottom)); width: 56px; height: 56px; border-radius: 50%; background: var(--primary); color: #fff; border: none; font-size: 22px; box-shadow: 0 6px 18px rgba(91,130,224,.5); cursor: pointer; z-index: 26; display: flex; align-items: center; justify-content: center; transition: transform .15s; }
     .fab:active { transform: scale(.9); }
     .nav-badge { position: absolute; top: 2px; left: 54%; background: var(--rose); color: #fff; font-size: 9.5px; font-weight: 700; min-width: 16px; height: 16px; border-radius: 999px; display: flex; align-items: center; justify-content: center; padding: 0 4px; box-shadow: 0 1px 3px rgba(0,0,0,.2); }
@@ -1031,6 +1035,57 @@
         }
       }
       document.getElementById('main-list').innerHTML = html;
+      if (isBoss && dashFilter === 'team') initCardDrag();
+    }
+
+    /* ---------- ลากจัดลำดับการ์ดสมาชิก (กดค้างเพื่อลาก) ---------- */
+    let mOrderLp = null, mDragEl = null, mDragging = false, suppressClick = false;
+    function getMemberOrder() { try { return JSON.parse(ssGet('tt_member_order') || '[]'); } catch (e) { return []; } }
+    function setMemberOrder(a) { ssSet('tt_member_order', JSON.stringify(a)); }
+    function orderedUsers() {
+      const ord = getMemberOrder();
+      return appData.users.slice().sort((a, b) => {
+        let ia = ord.indexOf(a.UserID), ib = ord.indexOf(b.UserID);
+        if (ia < 0) ia = 999; if (ib < 0) ib = 999; return ia - ib;
+      });
+    }
+    function initCardDrag() {
+      document.querySelectorAll('#main-list .member-card').forEach(card => {
+        card.onpointerdown = (e) => mCardDown(e, card);
+      });
+    }
+    function mCardDown(e, card) {
+      const sx = e.clientX, sy = e.clientY;
+      mOrderLp = setTimeout(() => mBeginDrag(card), 350);
+      const mv = (ev) => { if (!mDragging && Math.hypot(ev.clientX - sx, ev.clientY - sy) > 12) cleanup(); };
+      const up = () => cleanup();
+      function cleanup() { clearTimeout(mOrderLp); document.removeEventListener('pointermove', mv); document.removeEventListener('pointerup', up); }
+      document.addEventListener('pointermove', mv);
+      document.addEventListener('pointerup', up);
+    }
+    function mBeginDrag(card) {
+      mDragging = true; mDragEl = card; card.classList.add('dragging');
+      document.body.classList.add('reordering');
+      if (navigator.vibrate) navigator.vibrate(20);
+      document.addEventListener('pointermove', mDragMove, { passive: false });
+      document.addEventListener('pointerup', mDragEnd, { once: true });
+    }
+    function mDragMove(e) {
+      if (!mDragging) return;
+      e.preventDefault();
+      const cont = document.getElementById('main-list');
+      const others = [...cont.querySelectorAll('.member-card:not(.dragging)')];
+      const after = others.find(c => { const r = c.getBoundingClientRect(); return e.clientY < r.top + r.height / 2; });
+      if (after) cont.insertBefore(mDragEl, after); else cont.appendChild(mDragEl);
+    }
+    function mDragEnd() {
+      document.removeEventListener('pointermove', mDragMove);
+      if (mDragEl) mDragEl.classList.remove('dragging');
+      document.body.classList.remove('reordering');
+      const ids = [...document.querySelectorAll('#main-list .member-card')].map(c => c.dataset.uid);
+      setMemberOrder(ids);
+      mDragEl = null; mDragging = false;
+      suppressClick = true; setTimeout(() => { suppressClick = false; }, 350);
     }
 
     /* ---------- To-do ส่วนตัว (เก็บในเครื่อง แยกตามผู้ใช้) แบบมีป้ายกำกับ/ความเร่งด่วน/วันที่ ---------- */
@@ -1159,13 +1214,13 @@
     }
     function teamCardsHtml() {
       if (!appData.users.length) return emptyBox('ยังไม่มีสมาชิกทีม', 'fa-user');
-      return appData.users.map(u => {
+      return orderedUsers().map(u => {
         const my = appData.tasks.filter(t => t.AssigneeID === u.UserID);
         const over = my.filter(t => matchFilter(t,'overdue')).length;
         const pct = my.length ? Math.round(my.reduce((s,t)=>s+t.Progress,0)/my.length) : 0;
         const fill = over ? 'var(--rose)' : (pct === 100 ? 'var(--mint)' : 'var(--primary)');
         return `
-          <div class="card" onclick="openUser('${u.UserID}','dashboard')">
+          <div class="card member-card" data-uid="${u.UserID}" onclick="openUser('${u.UserID}','dashboard')">
             <div class="row">
               ${avatarDiv(u)}
               <div style="flex-grow:1;">
@@ -1174,6 +1229,7 @@
                 ${statusLine(u)}
               </div>
               <div style="text-align:right;"><div style="font-size:16px; font-weight:700;">${my.length}</div><div class="meta">งาน</div></div>
+              <i class="fa-solid fa-grip-lines drag-grip" style="color:#cfd6e4; margin-left:6px;"></i>
             </div>
             <div class="prog-bg"><div class="prog-fill" style="width:${pct}%; background:${fill}"></div></div>
             <div style="display:flex; justify-content:space-between; margin-top:8px;">
@@ -1357,6 +1413,7 @@
 
     /* ---------- per-user ---------- */
     function openUser(userId, from) {
+      if (suppressClick) return; // เพิ่งลากจัดลำดับ ไม่ต้องเปิดโปรไฟล์
       const viewUser = appData.users.find(u => u.UserID === userId);
       backFrom = from || 'team';
       document.getElementById('user-back').setAttribute('onclick', `goBack('${backFrom}')`);
