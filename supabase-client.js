@@ -31,6 +31,13 @@
     const { data } = await SB.client.auth.getSession();
     return (data && data.session && data.session.user && data.session.user.email) || '';
   };
+  // ฟัง auth event (INITIAL_SESSION / SIGNED_IN / TOKEN_REFRESHED / SIGNED_OUT)
+  SB.onAuth = (cb) => {
+    try {
+      SB.client.auth.onAuthStateChange((event, session) =>
+        cb(event, (session && session.user && session.user.email) || ''));
+    } catch (e) {}
+  };
 
   /* ---------- โหลดข้อมูลทั้งหมด (RLS กรองให้เองตามสิทธิ์) ---------- */
   async function fetchAll() {

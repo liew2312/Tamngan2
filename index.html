@@ -271,6 +271,16 @@
       </div>
     </div>
 
+    <!-- 0.5 Splash (ระหว่างกู้คืน session ตอนรีเฟรช — กันหน้า login เด้งแวบ) -->
+    <div id="screen-splash" class="screen hidden">
+      <div class="login">
+        <div class="logo"><svg width="42" height="42" viewBox="0 0 24 24" fill="#fff"><path d="M21.5 10.9V4.1C21.5 2.6 20.86 2 19.27 2H15.23C13.64 2 13 2.6 13 4.1V10.9C13 12.4 13.64 13 15.23 13H19.27C20.86 13 21.5 12.4 21.5 10.9Z"/><path d="M11 13.1V19.9C11 21.4 10.36 22 8.77 22H4.73C3.14 22 2.5 21.4 2.5 19.9V13.1C2.5 11.6 3.14 11 4.73 11H8.77C10.36 11 11 11.6 11 13.1Z"/><path opacity="0.4" d="M21.5 19.9V17.1C21.5 15.6 20.86 15 19.27 15H15.23C13.64 15 13 15.6 13 17.1V19.9C13 21.4 13.64 22 15.23 22H19.27C20.86 22 21.5 21.4 21.5 19.9Z"/><path opacity="0.4" d="M11 6.9V4.1C11 2.6 10.36 2 8.77 2H4.73C3.14 2 2.5 2.6 2.5 4.1V6.9C2.5 8.4 3.14 9 4.73 9H8.77C10.36 9 11 8.4 11 6.9Z"/></svg></div>
+        <h1>ตามงาน</h1>
+        <p class="sub2" id="splash-msg"><i class="fa-solid fa-spinner fa-spin"></i> กำลังเข้าสู่ระบบ…</p>
+        <button class="btn btn-primary hidden" id="splash-retry" onclick="retryLoad()" style="max-width:220px;"><i class="fa-solid fa-rotate-right"></i> ลองใหม่</button>
+      </div>
+    </div>
+
     <!-- 1. Dashboard -->
     <div id="screen-dashboard" class="screen hidden">
       <div class="header">
@@ -762,13 +772,47 @@
     const SB_MODE = () => (window.SB && window.SB.ready);
     let otpStage = false, otpEmail = '';
 
+    /* ---------- boot state (กันรีเฟรชแล้วเด้งไปหน้าล็อกอินทั้งที่ session ยังอยู่) ---------- */
+    let appStarted = false, appLoading = false, loadRetries = 0;
+    function hasStoredSession() {
+      // เช็คแบบ sync ว่ามี session ของ Supabase ค้างในเครื่องไหม (key: sb-xxxx-auth-token)
+      try {
+        for (let i = 0; i < localStorage.length; i++) {
+          const k = localStorage.key(i);
+          if (k && k.indexOf('sb-') === 0 && k.indexOf('-auth-token') > 0 && localStorage.getItem(k)) return true;
+        }
+      } catch (e) {}
+      return false;
+    }
+    function showSplash(msg, showRetry) {
+      document.querySelectorAll('.screen').forEach(s => s.classList.add('hidden'));
+      document.getElementById('nav').classList.add('hidden');
+      const fab = document.getElementById('fab-add'); if (fab) fab.classList.add('hidden');
+      document.getElementById('screen-splash').classList.remove('hidden');
+      document.getElementById('splash-msg').innerHTML = msg || '<i class="fa-solid fa-spinner fa-spin"></i> กำลังเข้าสู่ระบบ…';
+      document.getElementById('splash-retry').classList.toggle('hidden', !showRetry);
+    }
+    function retryLoad() { showSplash(); loadRetries = 0; loadApp(); }
+
     window.onload = () => {
       document.querySelectorAll('.boss-only').forEach(el => el.classList.add('hidden')); // ซ่อนไว้ก่อนจนกว่าจะรู้สิทธิ์
       if (SB_MODE()) {
-        // Supabase: เช็ก session เดิม (auto login)
-        window.SB.getSessionEmail().then(email => {
-          if (email) { sessionEmail = email; loadApp(); } else showLogin();
-        }).catch(showLogin);
+        // มี session ค้างในเครื่อง → โชว์ splash ระหว่างกู้คืน (ไม่ใช่หน้า login)
+        if (hasStoredSession()) showSplash();
+        // ให้ auth event เป็นตัวตัดสิน — ครอบคลุมทั้งรีเฟรช, magic link เด้งกลับ, token หมดอายุแล้วต่อใหม่
+        window.SB.onAuth((event, email) => {
+          if (event === 'SIGNED_OUT') { appStarted = false; appLoading = false; sessionEmail = ''; showLogin(); return; }
+          if (email) { if (!appStarted) { sessionEmail = email; loadApp(); } return; }
+          if (event === 'INITIAL_SESSION' && !appStarted && !appLoading) showLogin(); // ไม่มี session จริงๆ
+        });
+        // สำรอง: ถ้า event ไม่มาภายใน 4 วิ ค่อยเช็ค session ตรงๆ
+        setTimeout(() => {
+          if (appStarted || appLoading) return;
+          window.SB.getSessionEmail().then(email => {
+            if (email && !appStarted && !appLoading) { sessionEmail = email; loadApp(); }
+            else if (!email && !appStarted) showLogin();
+          }).catch(() => { if (!appStarted && !appLoading) showLogin(); });
+        }, 4000);
         return;
       }
       const saved = ssGet('tt_email');
@@ -839,22 +883,40 @@
       const fail = (e) => { ssDel('tt_email'); showLogin(); document.getElementById('login-err').innerText = (e && e.message) || 'เข้าสู่ระบบไม่สำเร็จ'; };
       callServer('loginWithEmail', [email]).then(done).catch(fail);
     }
+    let rtSubscribed = false;
     function loadApp() {
+      if (appLoading) return; // กันโหลดซ้อน (เช่น auth event มาซ้ำ)
+      appLoading = true;
       const render = (data) => {
+        appLoading = false; appStarted = true; loadRetries = 0;
         onData(data);
         document.getElementById('screen-login').classList.add('hidden');
+        document.getElementById('screen-splash').classList.add('hidden');
         activeTab = 'home'; switchTab('home');
         maybeAskNotif();
         srv('touchActive', [], () => {}); // บันทึกเวลาเข้าใช้งานล่าสุด
         loadTodosRemote(); // ดึง to-do ส่วนตัวจาก Supabase (sync ข้ามเครื่อง)
-        if (SB_MODE()) { window.SB.subscribe(() => reloadData()); } // realtime: อัปเดตทันที
+        if (SB_MODE() && !rtSubscribed) { rtSubscribed = true; window.SB.subscribe(() => reloadData()); } // realtime: อัปเดตทันที
         startReviewPoll(); // สำรอง: ดึงซ้ำทุก 60 วิ เผื่อ realtime ไม่ถึง
       };
       callServer('fetchAppData', [sessionEmail]).then(render)
-        .catch(e => { showLogin(); document.getElementById('login-err').innerText = (e && e.message) || 'โหลดข้อมูลไม่สำเร็จ'; });
+        .catch(e => {
+          appLoading = false;
+          if (SB_MODE()) {
+            // อย่าเด้งไปหน้าล็อกอินถ้า session ยังอยู่ — ลองใหม่อัตโนมัติ 2 ครั้ง (เผื่อ token กำลังต่ออายุ/เน็ตสะดุด)
+            if (loadRetries < 2) { loadRetries++; showSplash(); setTimeout(loadApp, 1200 * loadRetries); return; }
+            window.SB.getSessionEmail().then(email => {
+              if (email) showSplash('<i class="fa-solid fa-triangle-exclamation" style="color:var(--amber-fg);"></i> โหลดข้อมูลไม่สำเร็จ — เช็คอินเทอร์เน็ตแล้วลองใหม่', true);
+              else { showLogin(); loginErr((e && e.message) || 'เข้าสู่ระบบไม่สำเร็จ'); }
+            }).catch(() => showSplash('<i class="fa-solid fa-triangle-exclamation" style="color:var(--amber-fg);"></i> โหลดข้อมูลไม่สำเร็จ', true));
+            return;
+          }
+          showLogin(); document.getElementById('login-err').innerText = (e && e.message) || 'โหลดข้อมูลไม่สำเร็จ';
+        });
     }
     function logout() {
       ssDel('tt_email'); sessionEmail = ''; myUserId = null; isBoss = false; currentUser = null;
+      appStarted = false; appLoading = false; loadRetries = 0; todosCache = null;
       if (SB_MODE()) { try { window.SB.signOut(); } catch (e) {} }
       closeOverlay('modal-profile');
       document.getElementById('login-email').value = '';
