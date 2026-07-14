@@ -16,6 +16,10 @@
     window.SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNmb2NyamN6ZWl4cHdkamxocXh2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM4NjU4MjAsImV4cCI6MjA5OTQ0MTgyMH0.DX7tyh1hIVz6DNTF-fC-NBPBX68ZkEyCJgdS50bVM9o";  // anon public key
   </script>
   <script>
+    /* ใช้ธีมที่เลือกไว้ตั้งแต่ก่อน render (กันสีเดิมกระพริบ) */
+    try { var _th = localStorage.getItem('tt_theme'); if (_th) document.documentElement.setAttribute('data-theme', _th); } catch (e) {}
+  </script>
+  <script>
     // โหลด supabase-js เฉพาะเมื่อกรอกค่าไว้ (ไม่กรอก = ใช้ Apps Script ตามเดิม)
     if (window.SUPABASE_URL && window.SUPABASE_ANON_KEY) {
       document.write('<scr' + 'ipt src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"><\/scr' + 'ipt>');
@@ -48,6 +52,44 @@
       --amber: #B5791A; --amber-soft: #F6ECD6; --amber-fg: #8A5A10;
       --mint: #2F7A4F; --mint-soft: #E8F1EC; --mint-fg: #2F7A4F;
       --grey-soft: #F0EEE8; --grey-fg: #9C9CA4;
+
+      /* เงาเรืองของปุ่มหลัก + สีการ์ดสถิติ (แยกเป็นตัวแปรเพื่อรองรับธีม) */
+      --glow: rgba(146,28,30,.30);
+      --stat-over-bg: #921C1E;  --stat-over-fg: #ffffff;
+      --stat-today-bg: #B5791A; --stat-today-fg: #ffffff;
+      --stat-week-bg: #2F7A4F;  --stat-week-fg: #ffffff;
+    }
+
+    /* ---------- ธีมสี (เมนู เพิ่มเติม > ธีมสี — จำค่าต่อเครื่อง) ---------- */
+    html[data-theme="pastel"] {
+      --bg: #EFF3F9; --card: #ffffff; --text: #2B2E36; --muted: #7C8494;
+      --border: #E1E7F0;
+      --shadow: 0 2px 10px rgba(90,110,160,.08);
+      --shadow-lg: 0 12px 30px rgba(90,110,160,.16);
+      --primary: #5B76BD; --primary-soft: #E8EDF9; --primary-fg: #4D66AB;
+      --rose: #C96A77; --rose-soft: #F9E9EC; --rose-fg: #AE4E5C;
+      --amber: #C4913F; --amber-soft: #F7EEDD; --amber-fg: #96702C;
+      --mint: #5FA084; --mint-soft: #E7F2EC; --mint-fg: #3F7D62;
+      --grey-soft: #EDF0F5; --grey-fg: #9AA1AE;
+      --glow: rgba(91,118,189,.32);
+      --stat-over-bg: #F2DCE0;  --stat-over-fg: #AE4E5C;
+      --stat-today-bg: #F3E7CC; --stat-today-fg: #96702C;
+      --stat-week-bg: #DCEEE4;  --stat-week-fg: #3F7D62;
+    }
+    html[data-theme="minimal"] {
+      --bg: #FAFAF9; --card: #ffffff; --text: #1B1B1F; --muted: #88888E;
+      --border: #EAEAE7;
+      --shadow: 0 1px 5px rgba(0,0,0,.05);
+      --shadow-lg: 0 10px 26px rgba(0,0,0,.12);
+      --primary: #26262B; --primary-soft: #F1F1EF; --primary-fg: #26262B;
+      --rose: #B3564E; --rose-soft: #F6E9E8; --rose-fg: #A04A43;
+      --amber: #A8823C; --amber-soft: #F4EEDF; --amber-fg: #8A6A2C;
+      --mint: #53836A; --mint-soft: #E9F1EC; --mint-fg: #47745C;
+      --grey-soft: #F0F0EE; --grey-fg: #A0A0A5;
+      --glow: rgba(0,0,0,.14);
+      --stat-over-bg: #F6E9E8;  --stat-over-fg: #A04A43;
+      --stat-today-bg: #F4EEDF; --stat-today-fg: #8A6A2C;
+      --stat-week-bg: #E9F1EC;  --stat-week-fg: #47745C;
     }
     * { box-sizing: border-box; }
     body { font-family: 'AP','Prompt', sans-serif; background: var(--bg); color: var(--text); margin: 0; -webkit-font-smoothing: antialiased; }
@@ -70,7 +112,7 @@
 
     /* login */
     .login { min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 40px 28px; text-align: center; }
-    .login .logo { width: 78px; height: 78px; border-radius: 22px; background: linear-gradient(135deg,#7599e8,#5b82e0); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 32px; box-shadow: var(--shadow-lg); margin-bottom: 20px; background: #921C1E !important; }
+    .login .logo { width: 78px; height: 78px; border-radius: 22px; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 32px; box-shadow: var(--shadow-lg); margin-bottom: 20px; background: var(--primary); }
     .login h1 { font-size: 24px; margin: 0 0 6px; font-weight: 600; }
     .login .sub2 { color: var(--muted); font-size: 13px; margin: 0 0 26px; }
     .login .card { width: 100%; box-shadow: var(--shadow-lg); padding: 22px; text-align: left; margin: 0; }
@@ -110,7 +152,7 @@
     /* member home (1a) */
     .dash-date { font-size: 12.5px; color: var(--muted); margin: 3px 0 0; }
     .mh-group { display: flex; align-items: center; gap: 8px; margin: 16px 2px 6px; font-size: 13px; font-weight: 700; letter-spacing: .02em; color: var(--text); }
-    .mh-group.over { color: var(--primary); }
+    .mh-group.over { color: var(--rose-fg); }
     .mh-group i { font-size: 12px; }
     .mh-group .mh-gc { color: var(--grey-fg); font-weight: 600; font-size: 12px; }
     .mh-row { display: flex; align-items: flex-start; gap: 12px; padding: 13px 2px; cursor: pointer; }
@@ -122,14 +164,14 @@
 
     /* stats */
     .stats-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; padding: 6px 24px 6px; }
-    .stat-card { padding: 14px 12px; border-radius: 16px; box-shadow: var(--shadow); cursor: pointer; transition: transform .15s; color: #fff; }
+    .stat-card { padding: 14px 12px; border-radius: 16px; box-shadow: var(--shadow); cursor: pointer; transition: transform .15s; }
     .stat-card:active { transform: scale(.95); }
     .stat-card .st-ico { font-size: 15px; opacity: .95; }
     .stat-card h2 { margin: 6px 0 0; font-size: 26px; font-weight: 700; }
     .stat-card p { margin: 1px 0 0; font-size: 11px; font-weight: 500; opacity: .95; }
-    .stat-overdue { background: #921C1E; }
-    .stat-today  { background: #B5791A; }
-    .stat-week   { background: #2F7A4F; }
+    .stat-overdue { background: var(--stat-over-bg); color: var(--stat-over-fg); }
+    .stat-today  { background: var(--stat-today-bg); color: var(--stat-today-fg); }
+    .stat-week   { background: var(--stat-week-bg); color: var(--stat-week-fg); }
 
     /* chips */
     .filters { display: flex; gap: 8px; padding: 12px 24px 4px; overflow-x: auto; scrollbar-width: none; }
@@ -142,7 +184,7 @@
     #tabs-tasks, #home-toggle { gap: 10px; padding: 14px 24px 6px; }
     #tabs-tasks .chip, #home-toggle .chip { flex: 1; justify-content: center; padding: 13px 8px; font-size: 14px; font-weight: 600; border-radius: 14px; border: none; }
     #tabs-tasks .chip:not(.active), #home-toggle .chip:not(.active) { background: var(--primary-soft); color: var(--primary-fg); }
-    #tabs-tasks .chip.active, #home-toggle .chip.active { background: var(--primary); color: #fff; box-shadow: 0 4px 12px rgba(91,130,224,.4); }
+    #tabs-tasks .chip.active, #home-toggle .chip.active { background: var(--primary); color: #fff; box-shadow: 0 4px 12px var(--glow); }
 
     /* progress */
     .prog-bg { width: 100%; height: 8px; background: #e6eaf2; border-radius: 999px; overflow: hidden; margin: 10px 0 0; }
@@ -192,13 +234,13 @@
     .nav button { background: none; border: none; font-family: inherit; color: var(--muted); font-size: 10.5px; font-weight: 500; display: flex; flex-direction: column; align-items: center; gap: 3px; cursor: pointer; flex: 1; padding: 4px 0; transition: color .15s; }
     .nav button i { font-size: 18px; }
     .nav button.active { color: var(--primary); }
-    .nav button.add-btn i { background: var(--primary); color: #fff; width: 40px; height: 40px; border-radius: 14px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(91,130,224,.45); margin-top: -18px; }
+    .nav button.add-btn i { background: var(--primary); color: #fff; width: 40px; height: 40px; border-radius: 14px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px var(--glow); margin-top: -18px; }
     .nav button.add-btn { color: var(--primary-fg); font-weight: 600; }
     .member-card { touch-action: pan-y; }
     .member-card.dragging { opacity: .96; transform: scale(1.03); box-shadow: var(--shadow-lg); position: relative; z-index: 5; }
     .reordering .member-card { touch-action: none; }
     .drag-grip { cursor: grab; }
-    .fab { position: fixed; right: 18px; bottom: calc(78px + env(safe-area-inset-bottom)); width: 56px; height: 56px; border-radius: 50%; background: var(--primary); color: #fff; border: none; font-size: 22px; box-shadow: 0 6px 18px rgba(91,130,224,.5); cursor: pointer; z-index: 26; display: flex; align-items: center; justify-content: center; transition: transform .15s; }
+    .fab { position: fixed; right: 18px; bottom: calc(78px + env(safe-area-inset-bottom)); width: 56px; height: 56px; border-radius: 50%; background: var(--primary); color: #fff; border: none; font-size: 22px; box-shadow: 0 6px 18px var(--glow); cursor: pointer; z-index: 26; display: flex; align-items: center; justify-content: center; transition: transform .15s; }
     .fab:active { transform: scale(.9); }
     .bell-badge { position: absolute; top: -3px; right: -3px; background: var(--rose); color: #fff; font-size: 9.5px; font-weight: 700; min-width: 17px; height: 17px; border-radius: 999px; display: flex; align-items: center; justify-content: center; padding: 0 4px; box-shadow: 0 1px 3px rgba(0,0,0,.2); }
     .nav-badge { position: absolute; top: 2px; left: 54%; background: var(--rose); color: #fff; font-size: 9.5px; font-weight: 700; min-width: 16px; height: 16px; border-radius: 999px; display: flex; align-items: center; justify-content: center; padding: 0 4px; box-shadow: 0 1px 3px rgba(0,0,0,.2); }
@@ -650,6 +692,16 @@
       <div style="text-align:center; margin-top:14px;">
         <button onclick="logout()" style="background:none; border:none; color:var(--rose-fg); font-family:inherit; font-size:13px; font-weight:500; cursor:pointer;"><i class="fa-solid fa-right-from-bracket"></i> ออกจากระบบ</button>
       </div>
+    </div>
+  </div>
+
+  <!-- theme modal (ธีมสี) -->
+  <div id="modal-theme" class="backdrop modal-wrap hidden" onclick="if(event.target===this)closeOverlay('modal-theme')">
+    <div class="modal">
+      <h3><i class="fa-solid fa-palette"></i>ธีมสี</h3>
+      <p class="sub">เลือกโทนสีของแอป — จำค่าไว้ในเครื่องนี้</p>
+      <div id="theme-list"></div>
+      <div class="modal-actions"><button class="btn btn-ghost" onclick="closeOverlay('modal-theme')">ปิด</button></div>
     </div>
   </div>
 
@@ -1303,10 +1355,10 @@
       else if (review) circle = `<span class="mh-ck rev"><i class="fa-solid fa-hourglass-half"></i></span>`;
       else circle = `<span class="mh-ck" style="border-color:${ringColor}" onclick="event.stopPropagation(); quickSubmitTask('${t.TaskID}')"></span>`;
       const rowStyle = overdue
-        ? 'background:var(--primary-soft); border:1px solid #F3D4D4; border-radius:14px; padding:13px 14px; margin-bottom:8px;'
+        ? 'background:var(--rose-soft); border:1px solid var(--rose-soft); border-radius:14px; padding:13px 14px; margin-bottom:8px;'
         : 'border-bottom:1px solid var(--grey-soft);';
       const titleStyle = done ? 'color:var(--grey-fg); text-decoration:line-through;' : (review ? 'color:var(--muted);' : 'color:var(--text);');
-      const dueColor = overdue ? 'var(--primary)' : 'var(--muted)';
+      const dueColor = overdue ? 'var(--rose-fg)' : 'var(--muted)';
       return `<div class="mh-row" style="${rowStyle}" onclick="openTask('${t.TaskID}','dashboard')">
           ${circle}
           <div style="flex:1; min-width:0;">
@@ -1693,6 +1745,7 @@
       }
       if (isBoss) items.push({ ico: 'fa-ranking-star', bg: 'var(--amber)', t: 'Leaderboard', s: 'อันดับคะแนน KPI', fn: "setPerfTab('rank'); switchTab('performance')" });
       items.push({ ico: 'fa-id-badge', bg: 'var(--primary-fg)', t: 'โปรไฟล์ของฉัน', s: (currentUser && currentUser.Email) || '', fn: "openProfile()" });
+      items.push({ ico: 'fa-palette', bg: 'var(--mint)', t: 'ธีมสี', s: 'AP คลาสสิก · พาสเทล · มินิมอล', fn: "openThemeModal()" });
       items.push({ ico: 'fa-rotate', bg: 'var(--amber)', t: 'อัปเดต / เคลียร์แคช', s: 'ดึงเวอร์ชันล่าสุด (เวอร์ชัน ' + APP_VERSION + ')', fn: "clearCacheUpdate()" });
       items.push({ ico: 'fa-right-from-bracket', bg: 'var(--rose)', t: 'ออกจากระบบ', s: '', fn: "logout()" });
       document.getElementById('more-list').innerHTML = items.map(it =>
@@ -2113,6 +2166,38 @@
         switchTab('team');
       });
     }
+
+    /* ---------- ธีมสี ---------- */
+    const THEMES = [
+      { id: '',        name: 'AP คลาสสิก', desc: 'ครีมอุ่น · แดง AP (ค่าเริ่มต้น)', bg: '#F8F7F3', main: '#921C1E', soft: '#FAEBEB' },
+      { id: 'pastel',  name: 'พาสเทล',     desc: 'ฟ้าพาสเทลนุ่ม สบายตา',           bg: '#EFF3F9', main: '#5B76BD', soft: '#E8EDF9' },
+      { id: 'minimal', name: 'มินิมอล',    desc: 'ขาวสะอาด เรียบนิ่ง',              bg: '#FAFAF9', main: '#26262B', soft: '#F1F1EF' }
+    ];
+    function currentTheme() { return ssGet('tt_theme') || ''; }
+    function applyTheme(id) {
+      if (id) document.documentElement.setAttribute('data-theme', id);
+      else document.documentElement.removeAttribute('data-theme');
+      if (id) ssSet('tt_theme', id); else ssDel('tt_theme');
+      const t = THEMES.find(x => x.id === id) || THEMES[0];
+      const meta = document.querySelector('meta[name="theme-color"]');
+      if (meta) meta.setAttribute('content', t.main); // สีแถบบนของ PWA ตามธีม
+    }
+    function openThemeModal() {
+      const cur = currentTheme();
+      document.getElementById('theme-list').innerHTML = THEMES.map(t => `
+        <div class="row" style="padding:12px 10px; border:1.5px solid ${t.id === cur ? 'var(--primary)' : 'var(--border)'}; border-radius:14px; margin-bottom:10px; cursor:pointer; background:${t.id === cur ? 'var(--primary-soft)' : 'var(--card)'};" onclick="pickTheme('${t.id}')">
+          <div style="display:flex;">
+            <span style="width:26px;height:26px;border-radius:50%;background:${t.bg};border:1px solid var(--border);"></span>
+            <span style="width:26px;height:26px;border-radius:50%;background:${t.main};margin-left:-8px;border:2px solid var(--card);"></span>
+            <span style="width:26px;height:26px;border-radius:50%;background:${t.soft};margin-left:-8px;border:1px solid var(--border);"></span>
+          </div>
+          <div style="flex-grow:1;"><h4 style="margin:0;font-size:14.5px;">${t.name}</h4><p class="meta" style="margin:1px 0 0;">${t.desc}</p></div>
+          ${t.id === cur ? '<i class="fa-solid fa-circle-check" style="color:var(--primary-fg);font-size:18px;"></i>' : ''}
+        </div>`).join('');
+      document.getElementById('modal-theme').classList.remove('hidden');
+    }
+    function pickTheme(id) { applyTheme(id); openThemeModal(); }
+    applyTheme(currentTheme()); // sync meta theme-color ตอนเปิดแอป
 
     /* ---------- my profile (รูป + สเตตัส) ---------- */
     let profilePhoto = '';
