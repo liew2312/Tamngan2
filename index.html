@@ -19,6 +19,7 @@
     /* ใช้ธีมที่เลือกไว้ตั้งแต่ก่อน render (กันสีเดิมกระพริบ) */
     try { var _th = localStorage.getItem('tt_theme'); if (_th) document.documentElement.setAttribute('data-theme', _th); } catch (e) {}
     try { var _bg = localStorage.getItem('tt_bg'); if (_bg) document.documentElement.setAttribute('data-bg', _bg); } catch (e) {}
+    try { if (localStorage.getItem('tt_bg_dark') === '1') document.documentElement.setAttribute('data-bg-dark', '1'); } catch (e) {}
   </script>
   <script>
     // โหลด supabase-js เฉพาะเมื่อกรอกค่าไว้ (ไม่กรอก = ใช้ Apps Script ตามเดิม)
@@ -99,6 +100,37 @@
     html[data-bg="blush"] { --bg: #F9F0F1; }  /* ชมพูบลัช */
     html[data-bg="lilac"] { --bg: #F3F0F8; }  /* ม่วงไลแลค */
     html[data-bg="sand"]  { --bg: #F7F1E6; }  /* ทรายอุ่น */
+
+    /* พื้นหลังโทนเข้ม (การ์ดยังขาว — สไตล์แอป to-do) */
+    html[data-bg="navy"]  { --bg: #5B74C4; }  /* อินดิโก */
+    html[data-bg="teal"]  { --bg: #3E7A72; }  /* เขียวทีล */
+    html[data-bg="slate"] { --bg: #515B70; }  /* เทาสเลท */
+    html[data-bg="plum"]  { --bg: #7A5C86; }  /* ม่วงพลัม */
+    html[data-bg="mocha"] { --bg: #6F5646; }  /* น้ำตาลมอคค่า */
+
+    /* พื้นเข้ม: ตัวหนังสือ/องค์ประกอบที่อยู่บนพื้นหลังตรงๆ ต้องสว่างขึ้น
+       (ในการ์ดขาวยังใช้สีเดิม — ไม่แตะ --text เพื่อไม่ให้การ์ดพัง) */
+    html[data-bg-dark="1"] .greeting { color: rgba(255,255,255,.92); }
+    html[data-bg-dark="1"] h1.title { color: #fff; }
+    html[data-bg-dark="1"] .dash-date { color: rgba(255,255,255,.75); }
+    html[data-bg-dark="1"] .section-title { color: #fff; }
+    html[data-bg-dark="1"] .section-title i { color: rgba(255,255,255,.9); }
+    html[data-bg-dark="1"] .empty { color: rgba(255,255,255,.85); }
+    html[data-bg-dark="1"] .empty i { color: rgba(255,255,255,.45); }
+    html[data-bg-dark="1"] .mh-group { color: #fff; }
+    html[data-bg-dark="1"] .mh-group.over { color: #FFE1E3; }
+    html[data-bg-dark="1"] .mh-group .mh-gc { color: rgba(255,255,255,.7); }
+    /* แถวงานหน้าแรก: บนพื้นเข้มให้กลายเป็นการ์ดขาวทีละแถว (แบบภาพตัวอย่าง) */
+    html[data-bg-dark="1"] .mh-row { background: var(--card); border-radius: 14px; margin-bottom: 8px; padding: 13px 14px; box-shadow: var(--shadow); border-bottom: none !important; }
+    html[data-bg-dark="1"] .bubble-name { color: #fff; }
+    html[data-bg-dark="1"] .bubble-time { color: rgba(255,255,255,.7); }
+    html[data-bg-dark="1"] .login h1 { color: #fff; }
+    html[data-bg-dark="1"] .login .sub2, html[data-bg-dark="1"] .login .foot { color: rgba(255,255,255,.8); }
+    /* ช่องกรอก/ปุ่มรองในการ์ดขาว ใช้ --bg เป็นสี fill — บนพื้นเข้มให้สลับไปใช้เทาอ่อนแทน */
+    html[data-bg-dark="1"] .field input, html[data-bg-dark="1"] .field select, html[data-bg-dark="1"] .field textarea,
+    html[data-bg-dark="1"] .login input, html[data-bg-dark="1"] .chat-input-area input,
+    html[data-bg-dark="1"] .switch-row, html[data-bg-dark="1"] .edit-mini,
+    html[data-bg-dark="1"] .btn-ghost, html[data-bg-dark="1"] .sheet-item:active { background: var(--grey-soft); }
     * { box-sizing: border-box; }
     body { font-family: 'AP','Prompt', sans-serif; background: var(--bg); color: var(--text); margin: 0; -webkit-font-smoothing: antialiased; }
     .app { max-width: 430px; margin: 0 auto; min-height: 100vh; position: relative; padding-bottom: 96px; overflow-x: hidden; }
@@ -723,7 +755,7 @@
     let isBoss = false;       // สิทธิ์หัวหน้าทีม (ฝั่งเซิร์ฟเวอร์เป็นผู้ตัดสิน)
     let currentUser = null;   // ข้อมูลผู้ใช้ปัจจุบัน (คนที่ล็อกอิน)
     const PASTEL = ['#5b82e0','#e8536e','#e8942f','#22a97a','#a06ddb','#3fa9c4','#e07b9a'];
-    const APP_VERSION = '2.0';
+    const APP_VERSION = '2.1';
 
     /* อัปเดตเวอร์ชัน / เคลียร์แคช: ถอน service worker + ล้าง cache แล้วโหลดใหม่ */
     async function clearCacheUpdate() {
@@ -2188,9 +2220,7 @@
       if (id) document.documentElement.setAttribute('data-theme', id);
       else document.documentElement.removeAttribute('data-theme');
       if (id) ssSet('tt_theme', id); else ssDel('tt_theme');
-      const t = THEMES.find(x => x.id === id) || THEMES[0];
-      const meta = document.querySelector('meta[name="theme-color"]');
-      if (meta) meta.setAttribute('content', t.main); // สีแถบบนของ PWA ตามธีม
+      syncMeta(); // สีแถบบนของ PWA
     }
     function openThemeModal() {
       const cur = currentTheme();
@@ -2216,13 +2246,29 @@
       { id: 'sky',   name: 'ฟ้าอ่อน',   color: '#EDF3F8' },
       { id: 'blush', name: 'ชมพูบลัช', color: '#F9F0F1' },
       { id: 'lilac', name: 'ม่วงไลแลค', color: '#F3F0F8' },
-      { id: 'sand',  name: 'ทรายอุ่น',  color: '#F7F1E6' }
+      { id: 'sand',  name: 'ทรายอุ่น',  color: '#F7F1E6' },
+      { id: 'navy',  name: 'อินดิโก',   color: '#5B74C4', dark: true },
+      { id: 'teal',  name: 'เขียวทีล',  color: '#3E7A72', dark: true },
+      { id: 'slate', name: 'เทาสเลท',  color: '#515B70', dark: true },
+      { id: 'plum',  name: 'ม่วงพลัม',  color: '#7A5C86', dark: true },
+      { id: 'mocha', name: 'มอคค่า',    color: '#6F5646', dark: true }
     ];
     function currentBg() { return ssGet('tt_bg') || ''; }
+    function syncMeta() {
+      // สีแถบบนของ PWA: พื้นเข้ม → ใช้สีพื้น, อื่นๆ → ใช้สีหลักของธีม
+      const t = THEMES.find(x => x.id === currentTheme()) || THEMES[0];
+      const b = BGS.find(x => x.id === currentBg());
+      const meta = document.querySelector('meta[name="theme-color"]');
+      if (meta) meta.setAttribute('content', (b && b.dark) ? b.color : t.main);
+    }
     function applyBg(id) {
+      const b = BGS.find(x => x.id === id);
       if (id) document.documentElement.setAttribute('data-bg', id);
       else document.documentElement.removeAttribute('data-bg');
+      if (b && b.dark) { document.documentElement.setAttribute('data-bg-dark', '1'); ssSet('tt_bg_dark', '1'); }
+      else { document.documentElement.removeAttribute('data-bg-dark'); ssDel('tt_bg_dark'); }
       if (id) ssSet('tt_bg', id); else ssDel('tt_bg');
+      syncMeta();
     }
     function pickBg(id) { applyBg(id); renderBgList(); }
     function renderBgList() {
@@ -2232,7 +2278,7 @@
         <div onclick="pickBg('${b.id}')" title="${b.name}" style="text-align:center; cursor:pointer; width:52px;">
           <div style="width:42px; height:42px; border-radius:50%; margin:0 auto; background:${b.color || themeBg}; display:flex; align-items:center; justify-content:center;
                       border:${b.id === cur ? '2.5px solid var(--primary)' : '1.5px solid var(--border)'};">
-            ${b.id === cur ? '<i class="fa-solid fa-check" style="color:var(--primary-fg); font-size:13px;"></i>' : (b.id === '' ? '<i class="fa-solid fa-wand-magic-sparkles" style="color:var(--muted); font-size:12px;"></i>' : '')}
+            ${b.id === cur ? `<i class="fa-solid fa-check" style="color:${b.dark ? '#fff' : 'var(--primary-fg)'}; font-size:13px;"></i>` : (b.id === '' ? '<i class="fa-solid fa-wand-magic-sparkles" style="color:var(--muted); font-size:12px;"></i>' : '')}
           </div>
           <div class="meta" style="font-size:10px; margin-top:4px; white-space:nowrap;">${b.name}</div>
         </div>`).join('');
