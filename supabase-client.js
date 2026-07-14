@@ -135,8 +135,36 @@
     touchActive: async () => {
       try { const id = await meId(); await SB.client.from('app_users').update({ last_login: new Date().toISOString() }).eq('id', id); } catch (e) {}
       return true;
+    },
+
+    /* ---------- To-do ส่วนตัว (ตาราง todos — RLS เห็นเฉพาะของตัวเอง) ---------- */
+    listTodos: async () => {
+      const id = await meId();
+      const { data, error } = await SB.client.from('todos').select('*').eq('owner', id).order('created_at');
+      if (error) throw error;
+      return (data || []).map(uTodo);
+    },
+    addTodo: async (a) => {
+      const id = await meId(); const t = a[0] || {};
+      const { data, error } = await SB.client.from('todos')
+        .insert({ owner: id, text: t.text, tag: t.tag || null, priority: t.priority || 'ปกติ', date: dmyToDb(t.date), done: !!t.done })
+        .select().single();
+      if (error) throw error;
+      return uTodo(data);
+    },
+    updateTodo: async (a) => {
+      const t = a[1] || {};
+      const { error } = await SB.client.from('todos')
+        .update({ text: t.text, tag: t.tag || null, priority: t.priority || 'ปกติ', date: dmyToDb(t.date), done: !!t.done })
+        .eq('id', a[0]);
+      if (error) throw error; return true;
+    },
+    deleteTodo: async (a) => {
+      const { error } = await SB.client.from('todos').delete().eq('id', a[0]);
+      if (error) throw error; return true;
     }
   };
+  function uTodo(r) { return { id: r.id, text: r.text || '', tag: r.tag || '', priority: r.priority || 'ปกติ', date: dbToDMY(r.date), done: !!r.done }; }
 
   // srv() แนบ sessionEmail เป็น args[0] → ตัดทิ้ง (identity มาจาก session จริง)
   SB.call = function (action, args) {

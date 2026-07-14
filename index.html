@@ -846,6 +846,7 @@
         activeTab = 'home'; switchTab('home');
         maybeAskNotif();
         srv('touchActive', [], () => {}); // บันทึกเวลาเข้าใช้งานล่าสุด
+        loadTodosRemote(); // ดึง to-do ส่วนตัวจาก Supabase (sync ข้ามเครื่อง)
         if (SB_MODE()) { window.SB.subscribe(() => reloadData()); } // realtime: อัปเดตทันที
         startReviewPoll(); // สำรอง: ดึงซ้ำทุก 60 วิ เผื่อ realtime ไม่ถึง
       };
@@ -887,9 +888,11 @@
 
     /* ---------- identity ---------- */
     function applyCurrentUser(cu) {
+      const prevId = myUserId;
       currentUser = cu;
       myUserId = cu.UserID || null;
       isBoss = !!cu.isBoss;
+      if (prevId !== myUserId) todosCache = null; // เปลี่ยนผู้ใช้ → เคลียร์แคช to-do (กันเห็นของคนก่อนหน้า)
       // แสดง/ซ่อนเมนูจัดการตามสิทธิ์จริงจากเซิร์ฟเวอร์
       document.querySelectorAll('.boss-only').forEach(el => el.classList.toggle('hidden', !isBoss));
       // Member: ซ่อนชิป "ทีม" และปรับหัวข้อหน้าหลักเป็น "งานของฉัน"
@@ -955,7 +958,7 @@
       return PASTEL[i] || PASTEL[0];
     }
     function hasPhoto(u) { return u && u.Photo && /^(https?:|data:image)/i.test(u.Photo); }
-    function avatarInner(u) { return hasPhoto(u) ? `<img src="${u.Photo}" alt="">` : (u && u.Name ? u.Name[0] : '?'); }
+    function avatarInner(u) { return hasPhoto(u) ? `<img src="${escapeHtml(u.Photo)}" alt="">` : (u && u.Name ? escapeHtml(u.Name[0]) : '?'); }
     function avatarDiv(u, onclick) {
       return `<div class="avatar" style="background:${avatarColor(u.UserID)}" ${onclick ? 'onclick="' + onclick + '"' : ''}>${avatarInner(u)}</div>`;
     }
@@ -963,7 +966,7 @@
       el.style.background = (u && u.UserID) ? avatarColor(u.UserID) : 'var(--primary)';
       el.innerHTML = avatarInner(u || {});
     }
-    function statusLine(u) { return u && u.Status ? `<p class="ustatus"><i class="fa-regular fa-comment"></i>${u.Status}</p>` : ''; }
+    function statusLine(u) { return u && u.Status ? `<p class="ustatus"><i class="fa-regular fa-comment"></i>${escapeHtml(u.Status)}</p>` : ''; }
     function isActive(u) { return !u || String(u.Active).toUpperCase() !== 'FALSE'; }
     const PRIORITIES = ['สูง', 'ปกติ', 'ต่ำ'];
     function prioBadge(p) {
@@ -1288,7 +1291,7 @@
       document.getElementById('notifs-list').innerHTML = list.length ? list.map(o => `
         <div class="row" style="padding:11px 0; border-bottom:1px solid var(--border); cursor:pointer;" onclick="closeOverlay('modal-notifs'); openTask('${o.t.TaskID}','dashboard')">
           <div class="si-ico" style="width:38px; height:38px; border-radius:11px; background:${o.color}; color:#fff; display:flex; align-items:center; justify-content:center;"><i class="fa-solid ${o.icon}"></i></div>
-          <div style="flex-grow:1; min-width:0;"><h4 style="margin:0; font-size:14px;">${o.label}</h4><p class="meta" style="margin:1px 0 0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(o.sub || '')}</p></div>
+          <div style="flex-grow:1; min-width:0;"><h4 style="margin:0; font-size:14px;">${escapeHtml(o.label)}</h4><p class="meta" style="margin:1px 0 0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(o.sub || '')}</p></div>
           <i class="fa-solid fa-chevron-right" style="color:var(--muted);"></i>
         </div>`).join('') : emptyBox('ไม่มีการแจ้งเตือน', 'fa-bell-slash');
       document.getElementById('modal-notifs').classList.remove('hidden');
@@ -1344,12 +1347,34 @@
       suppressClick = true; setTimeout(() => { suppressClick = false; }, 350);
     }
 
-    /* ---------- To-do ส่วนตัว (เก็บในเครื่อง แยกตามผู้ใช้) แบบมีป้ายกำกับ/ความเร่งด่วน/วันที่ ---------- */
+    /* ---------- To-do ส่วนตัว — เก็บบน Supabase (sync ข้ามเครื่อง) + localStorage เป็น fallback/แคช ---------- */
     let tasksMode = 'assigned', editTodoIdx = -1;
     function escapeHtml(s) { return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
     function todoKey() { return 'tt_todos_' + (myUserId || sessionEmail || 'anon'); }
-    function getTodos() { try { return JSON.parse(ssGet(todoKey()) || '[]'); } catch (e) { return []; } }
-    function setTodos(a) { ssSet(todoKey(), JSON.stringify(a)); }
+    let todosCache = null; // null = ยังไม่โหลด
+    function getTodos() {
+      if (todosCache) return todosCache;
+      try { todosCache = JSON.parse(ssGet(todoKey()) || '[]'); } catch (e) { todosCache = []; }
+      return todosCache;
+    }
+    function setTodos(a) { todosCache = a; ssSet(todoKey(), JSON.stringify(a)); }
+    /* โหลดจาก Supabase ตอนเปิดแอป — ถ้าบนเซิร์ฟเวอร์ว่างแต่ในเครื่องมีของเดิม จะย้ายขึ้นให้อัตโนมัติครั้งแรก */
+    function loadTodosRemote() {
+      if (!SB_MODE() || !myUserId) return;
+      callServer('listTodos', [sessionEmail]).then(list => {
+        let local = [];
+        try { local = JSON.parse(ssGet(todoKey()) || '[]'); } catch (e) {}
+        if (!list.length && local.length) {
+          setTodos(local);
+          Promise.all(local.map(t => callServer('addTodo', [sessionEmail, t])))
+            .then(saved => { setTodos(saved); if (tasksMode === 'todo') renderTodos(); })
+            .catch(() => {});
+        } else {
+          setTodos(list);
+        }
+        if (tasksMode === 'todo') renderTodos();
+      }).catch(() => {}); // ออฟไลน์/ยังไม่รัน patch SQL → ใช้แคชในเครื่องไปก่อน
+    }
 
     function setTasksMode(m) {
       tasksMode = m;
@@ -1388,8 +1413,17 @@
         ? `<div class="card" style="padding:4px 14px;">${items.map(o => todoRow(o.t, o.i)).join('')}</div>`
         : emptyBox('ยังไม่มีรายการ — กดปุ่ม + มุมขวาล่างเพื่อเพิ่ม', 'fa-clipboard-check');
     }
-    function toggleTodo(i) { const list = getTodos(); if (list[i]) { list[i].done = !list[i].done; setTodos(list); renderTodos(); } }
-    function delTodo(i) { if (!confirm('ลบรายการนี้?')) return; const list = getTodos(); list.splice(i, 1); setTodos(list); renderTodos(); }
+    function toggleTodo(i) {
+      const list = getTodos(); if (!list[i]) return;
+      list[i].done = !list[i].done; setTodos(list); renderTodos();
+      if (SB_MODE() && list[i].id) callServer('updateTodo', [sessionEmail, list[i].id, list[i]]).catch(() => {});
+    }
+    function delTodo(i) {
+      if (!confirm('ลบรายการนี้?')) return;
+      const list = getTodos(); const it = list[i];
+      list.splice(i, 1); setTodos(list); renderTodos();
+      if (SB_MODE() && it && it.id) callServer('deleteTodo', [sessionEmail, it.id]).catch(() => {});
+    }
     function openTodoModal(i) {
       editTodoIdx = (typeof i === 'number') ? i : -1;
       const t = editTodoIdx >= 0 ? getTodos()[editTodoIdx] : { text: '', tag: '', priority: 'ปกติ', date: '' };
@@ -1403,16 +1437,25 @@
     function saveTodo() {
       const text = document.getElementById('td-text').value.trim();
       if (!text) { alert('กรุณากรอกรายการ'); return; }
+      const list = getTodos();
+      const prev = editTodoIdx >= 0 ? list[editTodoIdx] : null;
       const rec = {
+        id: prev ? prev.id : undefined,
         text: text,
         tag: document.getElementById('td-tag').value.trim(),
         priority: document.getElementById('td-prio').value,
         date: toDMY(document.getElementById('td-date').value),
-        done: editTodoIdx >= 0 ? !!getTodos()[editTodoIdx].done : false
+        done: prev ? !!prev.done : false
       };
-      const list = getTodos();
       if (editTodoIdx >= 0) list[editTodoIdx] = rec; else list.push(rec);
       setTodos(list); closeOverlay('modal-todo'); renderTodos();
+      if (SB_MODE()) {
+        if (rec.id) callServer('updateTodo', [sessionEmail, rec.id, rec]).catch(() => {});
+        else callServer('addTodo', [sessionEmail, rec]).then(saved => {
+          const l = getTodos(); const idx = l.indexOf(rec);
+          if (idx >= 0) { l[idx] = saved; setTodos(l); if (tasksMode === 'todo') renderTodos(); }
+        }).catch(() => {});
+      }
     }
 
     /* ---------- summary page (หัวหน้า) ---------- */
@@ -1432,7 +1475,7 @@
       const lowest = active.slice().sort((a, b) => a.m.kpi - b.m.kpi)[0];
 
       const statCard = (n, l, c) => `<div class="mini-stat"><div class="n" style="color:${c};">${n}</div><div class="l">${l}</div></div>`;
-      const leaderRow = (title, x, sub, color) => x ? `<div class="row" style="padding:8px 0; border-bottom:1px solid var(--border);"><div style="flex-grow:1;"><p class="meta" style="margin:0;">${title}</p><h4 style="margin:1px 0 0; font-size:14px;">${x.u.Name}</h4></div><span style="font-weight:700; color:${color};">${sub}</span></div>` : '';
+      const leaderRow = (title, x, sub, color) => x ? `<div class="row" style="padding:8px 0; border-bottom:1px solid var(--border);"><div style="flex-grow:1;"><p class="meta" style="margin:0;">${title}</p><h4 style="margin:1px 0 0; font-size:14px;">${escapeHtml(x.u.Name)}</h4></div><span style="font-weight:700; color:${color};">${sub}</span></div>` : '';
 
       let h = '';
       // ภาพรวมงานทั้งทีม
@@ -1449,7 +1492,7 @@
       if (top.length) {
         h += `<div class="card"><div class="section-title" style="margin:0 0 10px;"><i class="fa-solid fa-trophy"></i>Top 5 ผลงานดีที่สุด</div>`;
         top.forEach((x, i) => {
-          h += `<div class="row" style="margin-bottom:8px;"><span style="width:24px;text-align:center;font-size:16px;">${['🥇','🥈','🥉'][i] || (i + 1)}</span>${avatarDiv(x.u)}<div style="flex-grow:1;"><h4 style="margin:0;font-size:14px;">${x.u.Name}</h4><p class="meta" style="margin:0;">สำเร็จ ${pct(x.m.completionRate)} · ตรงเวลา ${pct(x.m.onTimeRate)}</p></div><div class="kpi-ring" style="width:40px;height:40px;font-size:13px;background:${kpiMeta(x.m.kpi).bg};color:${kpiMeta(x.m.kpi).color};">${x.m.kpi}</div></div>`;
+          h += `<div class="row" style="margin-bottom:8px;"><span style="width:24px;text-align:center;font-size:16px;">${['🥇','🥈','🥉'][i] || (i + 1)}</span>${avatarDiv(x.u)}<div style="flex-grow:1;"><h4 style="margin:0;font-size:14px;">${escapeHtml(x.u.Name)}</h4><p class="meta" style="margin:0;">สำเร็จ ${pct(x.m.completionRate)} · ตรงเวลา ${pct(x.m.onTimeRate)}</p></div><div class="kpi-ring" style="width:40px;height:40px;font-size:13px;background:${kpiMeta(x.m.kpi).bg};color:${kpiMeta(x.m.kpi).color};">${x.m.kpi}</div></div>`;
         });
         h += `</div>`;
       }
@@ -1476,8 +1519,8 @@
             <div class="row">
               ${avatarDiv(u)}
               <div style="flex-grow:1;">
-                <h4 style="margin:0; font-size:15px; font-weight:600;">${u.Name||''}</h4>
-                <p class="meta" style="margin:2px 0 0;"><i class="fa-solid fa-briefcase"></i>${u.Role||''}</p>
+                <h4 style="margin:0; font-size:15px; font-weight:600;">${escapeHtml(u.Name||'')}</h4>
+                <p class="meta" style="margin:2px 0 0;"><i class="fa-solid fa-briefcase"></i>${escapeHtml(u.Role||'')}</p>
                 ${statusLine(u)}
               </div>
               <div style="text-align:right;"><div style="font-size:16px; font-weight:700;">${my.length}</div><div class="meta">งาน</div></div>
@@ -1512,7 +1555,7 @@
     }
     function renderProjectChips() {
       const projects = Array.from(new Set(scopeTasks().map(t => t.Project).filter(Boolean)));
-      const chip = (val, label) => `<button class="chip ${projectFilter === val ? 'active' : ''}" onclick="setProjectFilter('${val.replace(/'/g,"\\'")}')"><i class="fa-solid fa-diagram-project"></i>${label}</button>`;
+      const chip = (val, label) => `<button class="chip ${projectFilter === val ? 'active' : ''}" onclick="setProjectFilter('${escapeHtml(String(val).replace(/\\/g,'\\\\').replace(/'/g,"\\'"))}')"><i class="fa-solid fa-diagram-project"></i>${escapeHtml(label)}</button>`;
       document.getElementById('tprojects').innerHTML = chip('__all__', 'ทุกโครงการ') + projects.map(p => chip(p, p)).join('');
     }
     function renderTasks() { renderProjectChips(); renderTaskList(); }
@@ -1557,7 +1600,7 @@
           const k = kpiMeta(x.m.kpi);
           return `<div class="card row" onclick="openUser('${x.u.UserID}','performance')">
             <div style="width:30px;text-align:center;font-size:18px;">${medal}</div>${avatarDiv(x.u)}
-            <div style="flex-grow:1;"><h4 style="margin:0;font-size:15px;">${x.u.Name}</h4><p class="meta" style="margin:0;">สำเร็จ ${pct(x.m.completionRate)} · เสร็จ ${x.m.doneCount} · ค้าง ${x.m.overdue}</p></div>
+            <div style="flex-grow:1;"><h4 style="margin:0;font-size:15px;">${escapeHtml(x.u.Name)}</h4><p class="meta" style="margin:0;">สำเร็จ ${pct(x.m.completionRate)} · เสร็จ ${x.m.doneCount} · ค้าง ${x.m.overdue}</p></div>
             <div class="kpi-ring" style="width:44px;height:44px;font-size:14px;background:${k.bg};color:${k.color};">${x.m.kpi}</div>
           </div>`;
         }).join('');
@@ -1565,7 +1608,7 @@
         el.innerHTML = rows.map(x => {
           const k = kpiMeta(x.m.kpi);
           return `<div class="card" onclick="openUser('${x.u.UserID}','performance')">
-            <div class="row" style="margin-bottom:10px;">${avatarDiv(x.u)}<div style="flex-grow:1;"><h4 style="margin:0;font-size:15px;">${x.u.Name}</h4><p class="meta" style="margin:0;">${x.u.Role || ''} · <span style="color:${k.color};font-weight:600;">${k.label}</span></p></div><div class="kpi-ring" style="background:${k.bg};color:${k.color};">${x.m.kpi}</div></div>
+            <div class="row" style="margin-bottom:10px;">${avatarDiv(x.u)}<div style="flex-grow:1;"><h4 style="margin:0;font-size:15px;">${escapeHtml(x.u.Name)}</h4><p class="meta" style="margin:0;">${escapeHtml(x.u.Role || '')} · <span style="color:${k.color};font-weight:600;">${k.label}</span></p></div><div class="kpi-ring" style="background:${k.bg};color:${k.color};">${x.m.kpi}</div></div>
             <div class="row">
               <div class="mini-stat"><div class="n">${x.m.total}</div><div class="l">งาน</div></div>
               <div class="mini-stat"><div class="n" style="color:var(--mint-fg);">${x.m.doneCount}</div><div class="l">เสร็จ</div></div>
@@ -1612,7 +1655,7 @@
       document.getElementById('activity-list').innerHTML = rows.map(u => `
         <div class="row" style="padding:11px 0; border-bottom:1px solid var(--border);">
           ${avatarDiv(u)}
-          <div style="flex-grow:1;"><h4 style="margin:0; font-size:14.5px;">${u.Name || ''}</h4><p class="meta" style="margin:1px 0 0;">${u.Role || ''}${isActive(u) ? '' : ' · <span style="color:var(--rose-fg);">ปิดใช้งาน</span>'}</p></div>
+          <div style="flex-grow:1;"><h4 style="margin:0; font-size:14.5px;">${escapeHtml(u.Name || '')}</h4><p class="meta" style="margin:1px 0 0;">${escapeHtml(u.Role || '')}${isActive(u) ? '' : ' · <span style="color:var(--rose-fg);">ปิดใช้งาน</span>'}</p></div>
           <span style="font-size:12px; color:${u.LastLogin ? 'var(--primary-fg)' : 'var(--muted)'}; white-space:nowrap;">${relTime(u.LastLogin)}</span>
         </div>`).join('') || emptyBox('ยังไม่มีข้อมูล', 'fa-user');
       document.getElementById('modal-activity').classList.remove('hidden');
@@ -1663,8 +1706,8 @@
           <div class="card row" style="${off ? 'opacity:.55;' : ''}" onclick="openUser('${u.UserID}','team')">
             ${avatarDiv(u)}
             <div style="flex-grow:1;">
-              <h4 style="margin:0; font-size:15px; font-weight:600;">${u.Name||''} ${off ? '<span class="badge b-todo" style="margin-left:4px;"><i class="fa-solid fa-ban"></i>ปิดใช้งาน</span>' : ''}</h4>
-              <p class="meta" style="margin:2px 0 0;"><i class="fa-solid fa-briefcase"></i>${u.Role||''}</p>
+              <h4 style="margin:0; font-size:15px; font-weight:600;">${escapeHtml(u.Name||'')} ${off ? '<span class="badge b-todo" style="margin-left:4px;"><i class="fa-solid fa-ban"></i>ปิดใช้งาน</span>' : ''}</h4>
+              <p class="meta" style="margin:2px 0 0;"><i class="fa-solid fa-briefcase"></i>${escapeHtml(u.Role||'')}</p>
               ${statusLine(u)}
             </div>
             <span class="badge b-todo"><i class="fa-solid fa-clipboard-list"></i>${my.length}</span>
@@ -1679,10 +1722,10 @@
       return `
         <div class="task-item" style="border-left-color:${s.color}" onclick="openTask('${t.TaskID}','${from}')">
           <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px;">
-            <h4>${t.Title||''}</h4>
+            <h4>${escapeHtml(t.Title||'')}</h4>
             <div style="display:flex; gap:6px; flex-shrink:0; flex-wrap:wrap; justify-content:flex-end;">${prioBadge(t.Priority)}<span class="badge ${s.cls}"><i class="fa-solid ${s.icon}"></i>${s.label}</span></div>
           </div>
-          <p class="meta" style="margin:5px 0 0;"><i class="fa-solid fa-diagram-project"></i>${t.Project||'—'}${showOwner && t.AssigneeName ? ' · ' + t.AssigneeName : ''}</p>
+          <p class="meta" style="margin:5px 0 0;"><i class="fa-solid fa-diagram-project"></i>${escapeHtml(t.Project||'—')}${showOwner && t.AssigneeName ? ' · ' + escapeHtml(t.AssigneeName) : ''}</p>
           <p class="meta" style="margin:2px 0 0;"><i class="fa-solid fa-calendar-day"></i>กำหนดจบ ${t.DueDate || '-'} · ${dueLabel(t)}</p>
           <div class="prog-bg"><div class="prog-fill" style="width:${t.Progress}%; background:${s.color}"></div></div>
         </div>`;
@@ -1696,7 +1739,7 @@
       document.getElementById('user-back').setAttribute('onclick', `goBack('${backFrom}')`);
       setAvatarEl(document.getElementById('u-avatar'), viewUser);
       document.getElementById('u-name').innerText = viewUser.Name || '';
-      document.getElementById('u-role').innerHTML = (viewUser.Role || '') + (viewUser.Status ? ' · <span style="color:var(--primary-fg);">' + viewUser.Status + '</span>' : '');
+      document.getElementById('u-role').innerHTML = escapeHtml(viewUser.Role || '') + (viewUser.Status ? ' · <span style="color:var(--primary-fg);">' + escapeHtml(viewUser.Status) + '</span>' : '');
       document.getElementById('u-kpi').innerHTML = isBoss ? kpiCardHtml(userId) : '';
       const my = appData.tasks.filter(t => t.AssigneeID === userId && !isCancelled(t));
       const active = my.filter(t => !isDone(t));
@@ -1797,9 +1840,9 @@
       card.classList.remove('hidden');
       document.getElementById('t-duelog').innerHTML = logs.map(d => `
         <div style="padding:8px 0; border-bottom:1px solid var(--border);">
-          <div style="font-size:12.5px; font-weight:600;"><span style="color:var(--muted); text-decoration:line-through;">${d.OldDate||'-'}</span> <i class="fa-solid fa-arrow-right" style="color:var(--muted); font-size:10px;"></i> ${d.NewDate||'-'}</div>
-          ${d.Reason ? `<div class="meta" style="margin-top:2px;"><i class="fa-solid fa-quote-left"></i> ${d.Reason}</div>` : ''}
-          <div class="meta" style="margin-top:2px;"><i class="fa-solid fa-user"></i>${d.ByName||''} · ${fmtTime(d.Timestamp)}</div>
+          <div style="font-size:12.5px; font-weight:600;"><span style="color:var(--muted); text-decoration:line-through;">${escapeHtml(d.OldDate||'-')}</span> <i class="fa-solid fa-arrow-right" style="color:var(--muted); font-size:10px;"></i> ${escapeHtml(d.NewDate||'-')}</div>
+          ${d.Reason ? `<div class="meta" style="margin-top:2px;"><i class="fa-solid fa-quote-left"></i> ${escapeHtml(d.Reason)}</div>` : ''}
+          <div class="meta" style="margin-top:2px;"><i class="fa-solid fa-user"></i>${escapeHtml(d.ByName||'')} · ${fmtTime(d.Timestamp)}</div>
         </div>`).join('');
     }
     function setProgUI(v) {
@@ -1843,8 +1886,8 @@
       if (!cs.length) { box.innerHTML = '<p class="empty" style="padding:20px;"><i class="fa-regular fa-comment-dots"></i>ยังไม่มีอัปเดต เริ่มเขียนอันแรกได้เลย</p>'; return; }
       box.innerHTML = cs.map(c => {
         const mine = c.UserID === myUserId;
-        const nm = mine ? '' : `<div class="bubble-name">${c.Name || nameOf(c.UserID)}</div>`;
-        return `${nm}<div class="bubble ${mine ? 'mine' : ''}">${c.Message}</div>
+        const nm = mine ? '' : `<div class="bubble-name">${escapeHtml(c.Name || nameOf(c.UserID))}</div>`;
+        return `${nm}<div class="bubble ${mine ? 'mine' : ''}">${escapeHtml(c.Message)}</div>
                 <div class="bubble-time" style="${mine?'text-align:right;':''}">${fmtTime(c.Timestamp)}</div>`;
       }).join('');
     }
@@ -1867,7 +1910,7 @@
 
     function assigneeOptions(selectedId) {
       return appData.users.filter(isActive).map(u =>
-        `<option value="${u.UserID}" ${u.UserID === selectedId ? 'selected' : ''}>${u.Name} · ${u.Role||''}</option>`).join('');
+        `<option value="${u.UserID}" ${u.UserID === selectedId ? 'selected' : ''}>${escapeHtml(u.Name)} · ${escapeHtml(u.Role||'')}</option>`).join('');
     }
     function openTaskModal() {
       document.getElementById('f-assignee').innerHTML = assigneeOptions();
