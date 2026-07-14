@@ -18,6 +18,7 @@
   <script>
     /* ใช้ธีมที่เลือกไว้ตั้งแต่ก่อน render (กันสีเดิมกระพริบ) */
     try { var _th = localStorage.getItem('tt_theme'); if (_th) document.documentElement.setAttribute('data-theme', _th); } catch (e) {}
+    try { var _bg = localStorage.getItem('tt_bg'); if (_bg) document.documentElement.setAttribute('data-bg', _bg); } catch (e) {}
   </script>
   <script>
     // โหลด supabase-js เฉพาะเมื่อกรอกค่าไว้ (ไม่กรอก = ใช้ Apps Script ตามเดิม)
@@ -91,6 +92,13 @@
       --stat-today-bg: #F4EEDF; --stat-today-fg: #8A6A2C;
       --stat-week-bg: #E9F1EC;  --stat-week-fg: #47745C;
     }
+
+    /* ---------- สีพื้นหลัง (เลือกทับธีมได้ — ต้องอยู่หลังบล็อกธีมเพื่อ override --bg) ---------- */
+    html[data-bg="sage"]  { --bg: #EEF4EF; }  /* เขียวเสจ */
+    html[data-bg="sky"]   { --bg: #EDF3F8; }  /* ฟ้าอ่อน */
+    html[data-bg="blush"] { --bg: #F9F0F1; }  /* ชมพูบลัช */
+    html[data-bg="lilac"] { --bg: #F3F0F8; }  /* ม่วงไลแลค */
+    html[data-bg="sand"]  { --bg: #F7F1E6; }  /* ทรายอุ่น */
     * { box-sizing: border-box; }
     body { font-family: 'AP','Prompt', sans-serif; background: var(--bg); color: var(--text); margin: 0; -webkit-font-smoothing: antialiased; }
     .app { max-width: 430px; margin: 0 auto; min-height: 100vh; position: relative; padding-bottom: 96px; overflow-x: hidden; }
@@ -701,7 +709,9 @@
       <h3><i class="fa-solid fa-palette"></i>ธีมสี</h3>
       <p class="sub">เลือกโทนสีของแอป — จำค่าไว้ในเครื่องนี้</p>
       <div id="theme-list"></div>
-      <div class="modal-actions"><button class="btn btn-ghost" onclick="closeOverlay('modal-theme')">ปิด</button></div>
+      <div class="section-title" style="margin:16px 0 10px;"><i class="fa-solid fa-fill-drip"></i>สีพื้นหลัง</div>
+      <div id="bg-list" style="display:flex; gap:10px; flex-wrap:wrap;"></div>
+      <div class="modal-actions" style="margin-top:16px;"><button class="btn btn-ghost" onclick="closeOverlay('modal-theme')">ปิด</button></div>
     </div>
   </div>
 
@@ -2194,9 +2204,39 @@
           <div style="flex-grow:1;"><h4 style="margin:0;font-size:14.5px;">${t.name}</h4><p class="meta" style="margin:1px 0 0;">${t.desc}</p></div>
           ${t.id === cur ? '<i class="fa-solid fa-circle-check" style="color:var(--primary-fg);font-size:18px;"></i>' : ''}
         </div>`).join('');
+      renderBgList();
       document.getElementById('modal-theme').classList.remove('hidden');
     }
     function pickTheme(id) { applyTheme(id); openThemeModal(); }
+
+    /* สีพื้นหลัง — เลือกทับธีมได้ (จำค่าต่อเครื่องเหมือนกัน) */
+    const BGS = [
+      { id: '',      name: 'ตามธีม',    color: '' },
+      { id: 'sage',  name: 'เขียวเสจ',  color: '#EEF4EF' },
+      { id: 'sky',   name: 'ฟ้าอ่อน',   color: '#EDF3F8' },
+      { id: 'blush', name: 'ชมพูบลัช', color: '#F9F0F1' },
+      { id: 'lilac', name: 'ม่วงไลแลค', color: '#F3F0F8' },
+      { id: 'sand',  name: 'ทรายอุ่น',  color: '#F7F1E6' }
+    ];
+    function currentBg() { return ssGet('tt_bg') || ''; }
+    function applyBg(id) {
+      if (id) document.documentElement.setAttribute('data-bg', id);
+      else document.documentElement.removeAttribute('data-bg');
+      if (id) ssSet('tt_bg', id); else ssDel('tt_bg');
+    }
+    function pickBg(id) { applyBg(id); renderBgList(); }
+    function renderBgList() {
+      const cur = currentBg();
+      const themeBg = (THEMES.find(x => x.id === currentTheme()) || THEMES[0]).bg;
+      document.getElementById('bg-list').innerHTML = BGS.map(b => `
+        <div onclick="pickBg('${b.id}')" title="${b.name}" style="text-align:center; cursor:pointer; width:52px;">
+          <div style="width:42px; height:42px; border-radius:50%; margin:0 auto; background:${b.color || themeBg}; display:flex; align-items:center; justify-content:center;
+                      border:${b.id === cur ? '2.5px solid var(--primary)' : '1.5px solid var(--border)'};">
+            ${b.id === cur ? '<i class="fa-solid fa-check" style="color:var(--primary-fg); font-size:13px;"></i>' : (b.id === '' ? '<i class="fa-solid fa-wand-magic-sparkles" style="color:var(--muted); font-size:12px;"></i>' : '')}
+          </div>
+          <div class="meta" style="font-size:10px; margin-top:4px; white-space:nowrap;">${b.name}</div>
+        </div>`).join('');
+    }
     applyTheme(currentTheme()); // sync meta theme-color ตอนเปิดแอป
 
     /* ---------- my profile (รูป + สเตตัส) ---------- */
