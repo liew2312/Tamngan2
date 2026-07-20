@@ -418,16 +418,15 @@
       <div id="tasks-assigned">
         <div class="search-wrap"><input id="task-search" placeholder="🔍 ค้นหางาน / โครงการ / ผู้รับผิดชอบ" oninput="renderTaskList()"></div>
         <div class="filters" id="tfilters">
-          <button class="chip active" data-tf="all" onclick="setTaskFilter('all')"><i class="fa-solid fa-list"></i>งานทั้งหมด</button>
-          <button class="chip" data-tf="open" onclick="setTaskFilter('open')"><i class="fa-regular fa-circle"></i>งานที่ยังไม่เสร็จ</button>
-          <button class="chip" data-tf="done" onclick="setTaskFilter('done')"><i class="fa-solid fa-circle-check"></i>งานที่เสร็จแล้ว</button>
+          <button class="chip active" data-tf="all" onclick="setTaskFilter('all')"><i class="fa-solid fa-list"></i>ทั้งหมด</button>
+          <button class="chip" data-tf="mine" onclick="setTaskFilter('mine')"><i class="fa-solid fa-user"></i>ของฉัน</button>
+          <button class="chip" data-tf="review" onclick="setTaskFilter('review')"><i class="fa-solid fa-hourglass-half"></i>รอตรวจ</button>
+          <button class="chip" data-tf="overdue" onclick="setTaskFilter('overdue')"><i class="fa-solid fa-triangle-exclamation"></i>เลยกำหนด</button>
+          <button class="chip" data-tf="today" onclick="setTaskFilter('today')"><i class="fa-solid fa-bell"></i>ครบวันนี้</button>
+          <button class="chip" data-tf="week" onclick="setTaskFilter('week')"><i class="fa-solid fa-calendar-week"></i>ใน 7 วัน</button>
+          <button class="chip" data-tf="done" onclick="setTaskFilter('done')"><i class="fa-solid fa-circle-check"></i>เสร็จแล้ว</button>
         </div>
-        <div class="filters" id="tsort">
-          <span style="align-self:center; font-size:12.5px; color:var(--muted); margin-right:2px; white-space:nowrap;"><i class="fa-solid fa-arrow-down-wide-short"></i> จัดเรียง</span>
-          <button class="chip active" data-ts="due" onclick="setTaskSort('due')"><i class="fa-solid fa-calendar-day"></i>ใกล้ครบกำหนด</button>
-          <button class="chip" data-ts="created" onclick="setTaskSort('created')"><i class="fa-solid fa-clock-rotate-left"></i>วันที่สั่งงาน</button>
-          <button class="chip" data-ts="priority" onclick="setTaskSort('priority')"><i class="fa-solid fa-flag"></i>งานสำคัญ</button>
-        </div>
+        <div class="filters" id="tprojects"></div>
         <div style="padding: 8px 24px 0;" id="tasks-list"></div>
       </div>
 
@@ -1208,7 +1207,6 @@
     function matchFilter(t, f) {
       const d = daysUntil(t);
       if (f === 'all') return !isCancelled(t);
-      if (f === 'open') return !isClosed(t);
       if (f === 'done') return isDone(t);
       if (f === 'review') return t.Status === 'รอตรวจ' && !isClosed(t);
       if (f === 'overdue') return !isClosed(t) && (t.Status === 'เลยกำหนด' || (d !== null && d < 0));
@@ -1354,33 +1352,25 @@
       const pctDone = total ? Math.round(doneCnt / total * 100) : 0;
       const circ = 2 * Math.PI * 19;
       const off = circ * (1 - pctDone / 100);
+      const progEl = document.getElementById('dash-progress');
+      if (progEl) progEl.innerHTML = `
+        <div class="card" style="display:flex; align-items:center; gap:14px; margin-bottom:16px;">
+          <div style="position:relative; width:52px; height:52px; flex-shrink:0;">
+            <svg width="52" height="52" viewBox="0 0 46 46"><circle cx="23" cy="23" r="19" fill="none" stroke="var(--grey-soft)" stroke-width="6"/><circle cx="23" cy="23" r="19" fill="none" stroke="var(--primary)" stroke-width="6" stroke-dasharray="${circ.toFixed(1)}" stroke-dashoffset="${off.toFixed(1)}" stroke-linecap="round" transform="rotate(-90 23 23)"/></svg>
+            <span style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:700; color:var(--primary);">${pctDone}%</span>
+          </div>
+          <div style="flex:1;">
+            <div style="font-size:15px; font-weight:600; color:var(--text);">เสร็จแล้ว ${doneCnt} จาก ${total} งาน</div>
+            <div style="font-size:12.5px; color:var(--muted);">${total === 0 ? 'ยังไม่มีงานที่ได้รับมอบหมาย' : (pctDone >= 100 ? 'เคลียร์งานหมดแล้ว เยี่ยมมาก' : 'ลุยอีกนิด ใกล้เคลียร์แล้ว')}</div>
+          </div>
+        </div>`;
+
       const open = mine.filter(t => !isDone(t) && t.Status !== 'รอตรวจ');
       const overdue = open.filter(t => { const d = daysUntil(t); return t.Status === 'เลยกำหนด' || (d !== null && d < 0); });
       const today = open.filter(t => daysUntil(t) === 0 && t.Status !== 'เลยกำหนด');
       const upcoming = open.filter(t => overdue.indexOf(t) < 0 && today.indexOf(t) < 0);
       const review = mine.filter(t => t.Status === 'รอตรวจ');
       const done = mine.filter(isDone);
-
-      const progEl = document.getElementById('dash-progress');
-      if (progEl) progEl.innerHTML = `
-        <div class="card" style="margin-bottom:16px;">
-          <div style="display:flex; align-items:center; gap:14px;">
-            <div style="position:relative; width:52px; height:52px; flex-shrink:0;">
-              <svg width="52" height="52" viewBox="0 0 46 46"><circle cx="23" cy="23" r="19" fill="none" stroke="var(--grey-soft)" stroke-width="6"/><circle cx="23" cy="23" r="19" fill="none" stroke="var(--primary)" stroke-width="6" stroke-dasharray="${circ.toFixed(1)}" stroke-dashoffset="${off.toFixed(1)}" stroke-linecap="round" transform="rotate(-90 23 23)"/></svg>
-              <span style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:700; color:var(--primary);">${pctDone}%</span>
-            </div>
-            <div style="flex:1;">
-              <div style="font-size:15px; font-weight:600; color:var(--text);">เสร็จแล้ว ${doneCnt} จาก ${total} งาน</div>
-              <div style="font-size:12.5px; color:var(--muted);">${total === 0 ? 'ยังไม่มีงานที่ได้รับมอบหมาย' : (pctDone >= 100 ? 'เคลียร์งานหมดแล้ว เยี่ยมมาก' : 'ลุยอีกนิด ใกล้เคลียร์แล้ว')}</div>
-            </div>
-          </div>
-          ${done.length ? `
-          <div onclick="toggleHomeDone()" style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-top:12px; padding-top:12px; border-top:1px solid var(--grey-soft); cursor:pointer;">
-            <span style="font-size:13.5px; font-weight:600; color:var(--mint-fg);"><i class="fa-solid fa-circle-check"></i> งานที่เสร็จแล้ว ${done.length}</span>
-            <i class="fa-solid fa-chevron-down" id="home-done-caret" style="color:var(--muted); transition:transform .2s;${homeDoneOpen ? ' transform:rotate(180deg);' : ''}"></i>
-          </div>
-          <div id="home-done-list" class="${homeDoneOpen ? '' : 'hidden'}" style="margin-top:4px;">${done.map(taskRow1a).join('')}</div>` : ''}
-        </div>`;
 
       const grp = (label, arr, cls) => arr.length
         ? `<div class="mh-group ${cls || ''}"><span>${label}</span><span class="mh-gc">${arr.length}</span></div>` + arr.map(taskRow1a).join('')
@@ -1390,6 +1380,7 @@
       html += grp('วันนี้', today);
       html += grp('ถัดไป', upcoming);
       html += grp('รอหัวหน้าตรวจ', review);
+      html += grp('เสร็จแล้ว', done);
       if (!total) html = emptyBox('ยังไม่มีงานที่ได้รับมอบหมาย', 'fa-mug-hot');
       document.getElementById('main-list').innerHTML = html;
     }
@@ -1428,14 +1419,6 @@
         showToast('ส่งงานให้หัวหน้าตรวจแล้ว');
         renderAll();
       });
-    }
-    let homeDoneOpen = false;
-    function toggleHomeDone() {
-      homeDoneOpen = !homeDoneOpen;
-      const l = document.getElementById('home-done-list');
-      const c = document.getElementById('home-done-caret');
-      if (l) l.classList.toggle('hidden', !homeDoneOpen);
-      if (c) c.style.transform = homeDoneOpen ? 'rotate(180deg)' : '';
     }
 
     /* ---------- กระดิ่งแจ้งเตือน ---------- */
@@ -1589,14 +1572,12 @@
     function toggleTodo(i) {
       const list = getTodos(); if (!list[i]) return;
       list[i].done = !list[i].done; setTodos(list); renderTodos();
-      if (activeTab === 'calendar') renderCalendar();
       if (SB_MODE() && list[i].id) callServer('updateTodo', [sessionEmail, list[i].id, list[i]]).catch(() => {});
     }
     function delTodo(i) {
       if (!confirm('ลบรายการนี้?')) return;
       const list = getTodos(); const it = list[i];
       list.splice(i, 1); setTodos(list); renderTodos();
-      if (activeTab === 'calendar') renderCalendar();
       if (SB_MODE() && it && it.id) callServer('deleteTodo', [sessionEmail, it.id]).catch(() => {});
     }
     function openTodoModal(i) {
@@ -1624,7 +1605,6 @@
       };
       if (editTodoIdx >= 0) list[editTodoIdx] = rec; else list.push(rec);
       setTodos(list); closeOverlay('modal-todo'); renderTodos();
-      if (activeTab === 'calendar') renderCalendar();
       if (SB_MODE()) {
         if (rec.id) callServer('updateTodo', [sessionEmail, rec.id, rec]).catch(() => {});
         else callServer('addTodo', [sessionEmail, rec]).then(saved => {
@@ -1724,19 +1704,12 @@
       document.querySelectorAll('#tfilters .chip').forEach(c => c.classList.toggle('active', c.dataset.tf === f));
       renderTasks();
     }
-    let taskSort = 'due'; // due = ใกล้ครบกำหนด, created = วันที่สั่งงาน, priority = งานสำคัญ
-    function setTaskSort(s) {
-      taskSort = s;
-      document.querySelectorAll('#tsort .chip').forEach(c => c.classList.toggle('active', c.dataset.ts === s));
-      renderTaskList();
-    }
     function setProjectFilter(p) {
       projectFilter = p;
       renderProjectChips();
       renderTaskList();
     }
     function renderProjectChips() {
-      const _tp = document.getElementById('tprojects'); if (!_tp) return;
       const projects = Array.from(new Set(scopeTasks().map(t => t.Project).filter(Boolean)));
       const chip = (val, label) => `<button class="chip ${projectFilter === val ? 'active' : ''}" onclick="setProjectFilter('${escapeHtml(String(val).replace(/\\/g,'\\\\').replace(/'/g,"\\'"))}')"><i class="fa-solid fa-diagram-project"></i>${escapeHtml(label)}</button>`;
       document.getElementById('tprojects').innerHTML = chip('__all__', 'ทุกโครงการ') + projects.map(p => chip(p, p)).join('');
@@ -1750,19 +1723,12 @@
       if (projectFilter !== '__all__') items = items.filter(t => (t.Project || '') === projectFilter);
       const q = (document.getElementById('task-search').value || '').trim().toLowerCase();
       if (q) items = items.filter(t => ((t.Title || '') + ' ' + (t.Project || '') + ' ' + (t.AssigneeName || '')).toLowerCase().includes(q));
-      const cmpDue = (a, b) => {
+      items = items.slice().sort((a, b) => {
         const da = daysUntil(a), db = daysUntil(b);
         if (da === null && db === null) return 0;
         if (da === null) return 1;
         if (db === null) return -1;
         return da - db;
-      };
-      const prioRank = t => (t.Priority === 'สูง' ? 0 : (t.Priority === 'ต่ำ' ? 2 : 1));
-      const createdMs = t => { const d = parseDMY(t.CreatedAt); return d ? +d : 0; };
-      items = items.slice().sort((a, b) => {
-        if (taskSort === 'created') { const c = createdMs(b) - createdMs(a); return c !== 0 ? c : cmpDue(a, b); } // สั่งใหม่สุดก่อน
-        if (taskSort === 'priority') { const p = prioRank(a) - prioRank(b); return p !== 0 ? p : cmpDue(a, b); }
-        return cmpDue(a, b); // ใกล้ครบกำหนด
       });
       document.getElementById('tasks-list').innerHTML =
         items.length ? items.map(t => taskCard(t, true, 'tasks')).join('') : emptyBox('ไม่มีงานในหมวดนี้', 'fa-circle-check');
@@ -1866,16 +1832,12 @@
       const today = new Date(); today.setHours(0, 0, 0, 0);
       const byDay = {};
       scope.forEach(t => { const due = parseDMY(t.DueDate); if (due && due.getFullYear() === y && due.getMonth() === mo) { const d = due.getDate(); (byDay[d] = byDay[d] || []).push(t); } });
-      const todosByDay = {};
-      getTodos().forEach(td => { const due = parseDMY(td.date); if (due && due.getFullYear() === y && due.getMonth() === mo) { const d = due.getDate(); (todosByDay[d] = todosByDay[d] || []).push(td); } });
       const dows = ['อา','จ','อ','พ','พฤ','ศ','ส'];
       let cells = '';
       for (let i = 0; i < startDow; i++) cells += `<div class="cal-cell dim"></div>`;
       for (let d = 1; d <= daysIn; d++) {
         const isToday = (y === today.getFullYear() && mo === today.getMonth() && d === today.getDate());
-        const dayDots = (byDay[d] || []).map(t => statusMeta(t).color)
-          .concat((todosByDay[d] || []).map(td => td.done ? 'var(--mint-fg)' : 'var(--amber-fg)'));
-        const dots = dayDots.slice(0, 3).map(color => `<span class="cal-dot" style="background:${color}"></span>`).join('');
+        const dots = (byDay[d] || []).slice(0, 3).map(t => `<span class="cal-dot" style="background:${statusMeta(t).color}"></span>`).join('');
         cells += `<div class="cal-cell ${isToday ? 'today' : ''} ${calSel === d ? 'sel' : ''}" onclick="calPick(${d})">${d}<div class="cal-dots">${dots}</div></div>`;
       }
       document.getElementById('cal-grid').innerHTML = `<div class="cal"><div class="cal-dow">${dows.map(x => `<span>${x}</span>`).join('')}</div><div class="cal-week">${cells}</div></div>`;
@@ -1886,14 +1848,8 @@
       if (!calSel) { title.innerHTML = '<i class="fa-solid fa-hand-pointer"></i>เลือกวันเพื่อดูงาน'; wrap.innerHTML = ''; return; }
       const y = calRef.getFullYear(), mo = calRef.getMonth();
       const items = scopeTasks().filter(t => { const due = parseDMY(t.DueDate); return due && due.getFullYear() === y && due.getMonth() === mo && due.getDate() === calSel; });
-      const todos = getTodos().map((td, i) => ({ td, i })).filter(o => { const due = parseDMY(o.td.date); return due && due.getFullYear() === y && due.getMonth() === mo && due.getDate() === calSel; });
       title.innerHTML = `<i class="fa-solid fa-calendar-day"></i>งานวันที่ ${calSel} ${calRef.toLocaleDateString('th-TH', { month: 'long' })}`;
-      let out = items.map(t => taskCard(t, true, 'calendar')).join('');
-      if (todos.length) {
-        out += `<div class="section-title" style="margin:14px 0 6px;"><i class="fa-solid fa-clipboard-check"></i>สิ่งที่ต้องทำ</div>`
-          + `<div class="card" style="padding:4px 14px;">${todos.map(o => todoRow(o.td, o.i)).join('')}</div>`;
-      }
-      wrap.innerHTML = out || emptyBox('ไม่มีงานในวันนี้', 'fa-mug-hot');
+      wrap.innerHTML = items.length ? items.map(t => taskCard(t, true, 'calendar')).join('') : emptyBox('ไม่มีงานในวันนี้', 'fa-mug-hot');
     }
 
     /* ---------- team screen ---------- */

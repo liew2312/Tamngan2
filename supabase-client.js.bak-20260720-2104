@@ -19,7 +19,7 @@
   function dbToDMY(d) { if (!d) return ''; const p = String(d).slice(0, 10).split('-'); return p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : ''; }
   function dmyToDb(s) { if (!s) return null; const p = String(s).split('/'); return p.length === 3 ? `${p[2]}-${pad(p[1])}-${pad(p[0])}` : null; }
   function uUser(r) { return { UserID: r.id, Name: r.name, Role: r.role, Email: r.email || '', Color: r.color, IsBoss: r.is_boss ? 'TRUE' : '', Photo: r.photo || '', Status: r.status || '', Active: r.active === false ? 'FALSE' : 'TRUE', LastLogin: r.last_login || '' }; }
-  function uTask(r) { return { TaskID: r.id, Project: r.project || '', Title: r.title || '', Description: r.description || '', AssigneeID: r.assignee || '', DueDate: dbToDMY(r.due_date), Status: r.status || 'ยังไม่เริ่ม', Progress: parseInt(r.progress) || 0, Priority: r.priority || 'ปกติ', CompletedAt: r.completed_at || '', CreatedAt: r.created_at || '', comments: [], dueLog: [] }; }
+  function uTask(r) { return { TaskID: r.id, Project: r.project || '', Title: r.title || '', Description: r.description || '', AssigneeID: r.assignee || '', DueDate: dbToDMY(r.due_date), Status: r.status || 'ยังไม่เริ่ม', Progress: parseInt(r.progress) || 0, Priority: r.priority || 'ปกติ', CompletedAt: r.completed_at || '', comments: [], dueLog: [] }; }
 
   /* ---------- Auth (อีเมล: กดลิงก์ หรือกรอกรหัส) ---------- */
   SB.appUrl = location.origin + location.pathname; // ปลายทางให้ magic link เด้งกลับ
