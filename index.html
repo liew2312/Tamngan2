@@ -276,6 +276,21 @@
     .hist-row .t { flex-grow: 1; min-width: 0; font-size: 12.5px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .hist-row .d { font-size: 11px; color: var(--muted); white-space: nowrap; }
     .hist-row .dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+    /* ---- แถบเครื่องมือหน้างาน: ค้นหา + ปุ่มตัวกรอง ---- */
+    .tools-row { display: flex; gap: 8px; align-items: center; padding: 10px 24px 0; }
+    .tools-row input { flex-grow: 1; min-width: 0; border: 1px solid var(--border); background: var(--card); border-radius: 999px; padding: 11px 16px; font-family: inherit; font-size: 13px; outline: none; box-shadow: var(--shadow); }
+    .tools-row input:focus { border-color: var(--primary); }
+    .tool-btn { position: relative; flex-shrink: 0; width: 42px; height: 42px; border-radius: 50%; border: 1px solid var(--border); background: var(--card); color: var(--primary-fg); font-size: 15px; box-shadow: var(--shadow); cursor: pointer; }
+    .tool-btn span { position: absolute; top: -3px; right: -3px; min-width: 17px; height: 17px; line-height: 17px; border-radius: 999px; background: var(--primary); color: #fff; font-size: 10px; font-weight: 700; font-family: inherit; }
+    /* ---- กลุ่มงานตามความเร่งด่วน ---- */
+    .grp { margin-bottom: 10px; }
+    .grp-head { display: flex; align-items: center; gap: 8px; padding: 7px 2px; cursor: pointer; }
+    .grp-head .bar { width: 4px; height: 15px; border-radius: 2px; flex-shrink: 0; }
+    .grp-head h4 { margin: 0; font-size: 13px; font-weight: 700; flex-grow: 1; }
+    .grp-head .n { font-size: 11.5px; font-weight: 600; color: var(--muted); }
+    .grp-head .chev { font-size: 10px; color: var(--muted); transition: transform .15s; }
+    .grp.open .grp-head .chev { transform: rotate(90deg); }
+    .grp-more { display: block; width: 100%; margin: 2px 0 6px; padding: 7px; border: 1px dashed var(--border); border-radius: 10px; background: none; font-family: inherit; font-size: 12px; font-weight: 600; color: var(--muted); cursor: pointer; }
     /* ---- ชิปโครงการที่ประจำ (หัวการ์ดหน้างานรายคน) ---- */
     .proj-chip { display: inline-flex; align-items: center; gap: 5px; max-width: 168px; font-size: 11px; font-weight: 600; padding: 4px 9px; border-radius: 8px; background: var(--primary-soft, var(--grey-soft)); color: var(--primary-fg); }
     .proj-chip span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -446,19 +461,12 @@
       </div>
 
       <div id="tasks-assigned">
-        <div class="search-wrap"><input id="task-search" placeholder="🔍 ค้นหางาน / โครงการ / ผู้รับผิดชอบ" oninput="renderTaskList()"></div>
-        <div class="filters" id="tfilters">
-          <button class="chip active" data-tf="all" onclick="setTaskFilter('all')"><i class="fa-solid fa-list"></i>งานทั้งหมด</button>
-          <button class="chip" data-tf="open" onclick="setTaskFilter('open')"><i class="fa-regular fa-circle"></i>งานที่ยังไม่เสร็จ</button>
-          <button class="chip" data-tf="done" onclick="setTaskFilter('done')"><i class="fa-solid fa-circle-check"></i>งานที่เสร็จแล้ว</button>
+        <div class="tools-row">
+          <input id="task-search" placeholder="🔍 ค้นหางาน / โครงการ / ผู้รับผิดชอบ" oninput="renderTaskList()">
+          <button class="tool-btn" onclick="openTFilter()" title="ตัวกรองและการจัดเรียง"><i class="fa-solid fa-sliders"></i><span id="tfilter-badge" class="hidden">0</span></button>
         </div>
-        <div class="filters" id="tsort">
-          <span style="align-self:center; font-size:12.5px; color:var(--muted); margin-right:2px; white-space:nowrap;"><i class="fa-solid fa-arrow-down-wide-short"></i> จัดเรียง</span>
-          <button class="chip active" data-ts="due" onclick="setTaskSort('due')"><i class="fa-solid fa-calendar-day"></i>ใกล้ครบกำหนด</button>
-          <button class="chip" data-ts="created" onclick="setTaskSort('created')"><i class="fa-solid fa-clock-rotate-left"></i>วันที่สั่งงาน</button>
-          <button class="chip" data-ts="priority" onclick="setTaskSort('priority')"><i class="fa-solid fa-flag"></i>งานสำคัญ</button>
-        </div>
-        <div style="padding: 8px 24px 0;" id="tasks-list"></div>
+        <div class="filters" id="tfilters"></div>
+        <div style="padding: 4px 24px 0;" id="tasks-list"></div>
       </div>
 
       <div id="tasks-todo" class="hidden" style="padding: 12px 24px 0;" ></div>
@@ -727,6 +735,26 @@
     </div>
   </div>
 
+  <!-- ตัวกรอง/จัดเรียง ของหน้างาน -->
+  <div id="modal-tfilter" class="backdrop modal-wrap hidden" onclick="if(event.target===this)closeOverlay('modal-tfilter')">
+    <div class="modal">
+      <h3><i class="fa-solid fa-sliders"></i>ตัวกรองและการจัดเรียง</h3>
+      <div class="field"><label>โครงการ</label><select id="tf-project" onchange="applyTFilter()"></select></div>
+      <div class="field">
+        <label>จัดเรียง</label>
+        <div class="filters" id="tf-sort" style="padding:2px 0 0; overflow-x:visible; flex-wrap:wrap;">
+          <button class="chip" data-ts="due" onclick="setTaskSort('due')"><i class="fa-solid fa-calendar-day"></i>ใกล้ครบกำหนด</button>
+          <button class="chip" data-ts="created" onclick="setTaskSort('created')"><i class="fa-solid fa-clock-rotate-left"></i>วันที่สั่งงาน</button>
+          <button class="chip" data-ts="priority" onclick="setTaskSort('priority')"><i class="fa-solid fa-flag"></i>งานสำคัญ</button>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" onclick="resetTFilter()"><i class="fa-solid fa-rotate-left"></i> ล้างตัวกรอง</button>
+        <button class="btn btn-primary" onclick="closeOverlay('modal-tfilter')"><i class="fa-solid fa-check"></i> เสร็จ</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Google Calendar modal -->
   <div id="modal-gcal" class="backdrop modal-wrap hidden" onclick="if(event.target===this)closeOverlay('modal-gcal')">
     <div class="modal">
@@ -804,7 +832,7 @@
   <script>
     let appData = { users: [], tasks: [] };
     let currentTask = null;
-    let dashFilter = 'team', taskFilter = 'all', activeTab = 'home', backFrom = 'user';
+    let dashFilter = 'team', taskFilter = 'open', activeTab = 'home', backFrom = 'user';
     let myUserId = null;      // กำหนดจากอีเมลผู้ใช้ที่ล็อกอิน (ฝั่งเซิร์ฟเวอร์เป็นผู้ระบุ)
     let isBoss = false;       // สิทธิ์หัวหน้าทีม (ฝั่งเซิร์ฟเวอร์เป็นผู้ตัดสิน)
     let isAdmin = false;      // ผู้ดูแลระบบ — เห็นทุกทีม สร้างหัวหน้างานได้
@@ -1788,27 +1816,113 @@
     let projectFilter = '__all__';
     function setTaskFilter(f) {
       taskFilter = f;
-      document.querySelectorAll('#tfilters .chip').forEach(c => c.classList.toggle('active', c.dataset.tf === f));
+      grpExpanded = {};                     // เปลี่ยนหมวด → รีเซ็ต "ดูอีก N"
       renderTasks();
     }
     let taskSort = 'due'; // due = ใกล้ครบกำหนด, created = วันที่สั่งงาน, priority = งานสำคัญ
     function setTaskSort(s) {
       taskSort = s;
-      document.querySelectorAll('#tsort .chip').forEach(c => c.classList.toggle('active', c.dataset.ts === s));
-      renderTaskList();
+      document.querySelectorAll('#tf-sort .chip').forEach(c => c.classList.toggle('active', c.dataset.ts === s));
+      renderTaskList(); renderTFilterBadge();
     }
     function setProjectFilter(p) {
       projectFilter = p;
-      renderProjectChips();
       renderTaskList();
+      renderTFilterBadge();
     }
-    function renderProjectChips() {
-      const _tp = document.getElementById('tprojects'); if (!_tp) return;
-      const projects = Array.from(new Set(scopeTasks().map(t => t.Project).filter(Boolean)));
-      const chip = (val, label) => `<button class="chip ${projectFilter === val ? 'active' : ''}" onclick="setProjectFilter('${escapeHtml(String(val).replace(/\\/g,'\\\\').replace(/'/g,"\\'"))}')"><i class="fa-solid fa-diagram-project"></i>${escapeHtml(label)}</button>`;
-      document.getElementById('tprojects').innerHTML = chip('__all__', 'ทุกโครงการ') + projects.map(p => chip(p, p)).join('');
+    /* ---------- ตัวกรอง/จัดเรียง (sheet) ---------- */
+    function tFilterCount() { return (projectFilter !== '__all__' ? 1 : 0) + (taskSort !== 'due' ? 1 : 0); }
+    function renderTFilterBadge() {
+      const b = document.getElementById('tfilter-badge'); if (!b) return;
+      const n = tFilterCount();
+      b.innerText = n; b.classList.toggle('hidden', n === 0);
     }
-    function renderTasks() { renderProjectChips(); renderTaskList(); }
+    function openTFilter() {
+      const sel = document.getElementById('tf-project');
+      const projects = Array.from(new Set(scopeTasks().map(t => (t.Project || '').trim()).filter(Boolean))).sort();
+      sel.innerHTML = `<option value="__all__">ทุกโครงการ</option>`
+        + projects.map(p => `<option value="${escapeHtml(p)}"${p === projectFilter ? ' selected' : ''}>${escapeHtml(p)}</option>`).join('');
+      document.querySelectorAll('#tf-sort .chip').forEach(c => c.classList.toggle('active', c.dataset.ts === taskSort));
+      document.getElementById('modal-tfilter').classList.remove('hidden');
+    }
+    function applyTFilter() { setProjectFilter(document.getElementById('tf-project').value); }
+    function resetTFilter() {
+      projectFilter = '__all__'; taskSort = 'due';
+      document.getElementById('tf-project').value = '__all__';
+      document.querySelectorAll('#tf-sort .chip').forEach(c => c.classList.toggle('active', c.dataset.ts === 'due'));
+      renderTaskList(); renderTFilterBadge();
+    }
+
+    /* ---------- ชิปสถานะ (มีจำนวนกำกับ) ---------- */
+    function renderTaskChips() {
+      const el = document.getElementById('tfilters'); if (!el) return;
+      let base = scopeTasks().filter(t => !isCancelled(t));
+      if (projectFilter !== '__all__') base = base.filter(t => (t.Project || '') === projectFilter);
+      const n = {
+        open: base.filter(t => !isClosed(t)).length,
+        overdue: base.filter(t => matchFilter(t, 'overdue')).length,
+        review: base.filter(t => matchFilter(t, 'review')).length,
+        done: base.filter(isDone).length,
+        all: base.length
+      };
+      const chip = (f, ico, label, count, danger) =>
+        `<button class="chip ${taskFilter === f ? 'active' : ''}" data-tf="${f}" onclick="setTaskFilter('${f}')">
+           <i class="fa-solid ${ico}"></i>${label}${count !== null ? ` <b style="font-weight:700;${danger && count && taskFilter !== f ? 'color:var(--rose-fg);' : ''}">${count}</b>` : ''}
+         </button>`;
+      let h = chip('open', 'fa-circle-half-stroke', 'ยังไม่เสร็จ', n.open)
+            + chip('overdue', 'fa-triangle-exclamation', 'เลยกำหนด', n.overdue, true);
+      if (isBoss && n.review) h += chip('review', 'fa-hourglass-half', 'รอตรวจ', n.review, true);
+      h += chip('done', 'fa-circle-check', 'เสร็จแล้ว', n.done)
+         + chip('all', 'fa-list', 'ทั้งหมด', n.all);
+      el.innerHTML = h;
+    }
+
+    /* ---------- กลุ่มงานตามความเร่งด่วน ---------- */
+    let grpClosed = { nodue: 1, done: 1 };            // ยุบไว้ตั้งแต่แรก
+    let grpExpanded = {};                              // กลุ่มที่กด "ดูอีก N"
+    const GRP_LIMIT = 8;
+    function toggleGrp(k) { if (grpClosed[k]) delete grpClosed[k]; else grpClosed[k] = 1; renderTaskList(); }
+    function expandGrp(k) { grpExpanded[k] = 1; renderTaskList(); }
+
+    function groupOf(t) {
+      if (isDone(t)) return 'done';
+      const d = daysUntil(t);
+      if (d === null) return 'nodue';
+      if (d < 0) return 'overdue';
+      if (d <= 7) return 'week';
+      return 'next';
+    }
+    const GRP_META = {
+      overdue: { label: 'เลยกำหนด', color: 'var(--rose-fg)' },
+      week:    { label: 'ครบภายในสัปดาห์นี้', color: 'var(--amber-fg)' },
+      next:    { label: 'ต่อไป', color: 'var(--grey-fg)' },
+      nodue:   { label: 'ไม่มีกำหนดส่ง', color: 'var(--grey-fg)' },
+      done:    { label: 'เสร็จแล้ว', color: 'var(--mint-fg)' }
+    };
+    function groupBlockHtml(key, items) {
+      const m = GRP_META[key];
+      const open = !grpClosed[key];
+      const slim = (key === 'done');
+      let body = '';
+      if (open) {
+        const showAll = grpExpanded[key] || items.length <= GRP_LIMIT;
+        const shown = showAll ? items : items.slice(0, GRP_LIMIT);
+        body = slim
+          ? `<div class="hist-mo" style="margin:0;"><div class="hist-body" style="border-top:none;">${shown.map(t => historyRowHtml(t, 'tasks')).join('')}</div></div>`
+          : shown.map(t => taskCard(t, true, 'tasks')).join('');
+        if (!showAll) body += `<button class="grp-more" onclick="expandGrp('${key}')">ดูอีก ${items.length - shown.length} รายการ</button>`;
+      }
+      return `<div class="grp ${open ? 'open' : ''}">
+          <div class="grp-head" onclick="toggleGrp('${key}')">
+            <span class="bar" style="background:${m.color}"></span>
+            <i class="fa-solid fa-chevron-right chev"></i>
+            <h4 style="color:${m.color}">${m.label}</h4>
+            <span class="n">${items.length}</span>
+          </div>${body}
+        </div>`;
+    }
+
+    function renderTasks() { renderTaskChips(); renderTFilterBadge(); renderTaskList(); }
     function renderTaskList() {
       const base = scopeTasks(); // หัวหน้าเห็นทุกงาน / พนักงานเห็นเฉพาะงานตัวเอง
       let items = (taskFilter === 'mine')
@@ -1831,8 +1945,23 @@
         if (taskSort === 'priority') { const p = prioRank(a) - prioRank(b); return p !== 0 ? p : cmpDue(a, b); }
         return cmpDue(a, b); // ใกล้ครบกำหนด
       });
-      document.getElementById('tasks-list').innerHTML =
-        items.length ? items.map(t => taskCard(t, true, 'tasks')).join('') : emptyBox('ไม่มีงานในหมวดนี้', 'fa-circle-check');
+      const el = document.getElementById('tasks-list');
+      if (!items.length) { el.innerHTML = emptyBox(q ? 'ไม่พบงานที่ค้นหา' : 'ไม่มีงานในหมวดนี้', 'fa-circle-check'); return; }
+      // กำลังค้นหา หรือดูหมวดเดียวอยู่แล้ว → ลิสเรียบ ไม่ต้องจัดกลุ่มซ้ำซ้อน
+      if (q || taskFilter === 'overdue' || taskFilter === 'review') {
+        el.innerHTML = items.map(t => taskCard(t, true, 'tasks')).join('');
+        return;
+      }
+      if (taskFilter === 'done') {
+        el.innerHTML = `<div class="hist-mo" style="margin:0;"><div class="hist-body" style="border-top:none;">${items.map(t => historyRowHtml(t, 'tasks')).join('')}</div></div>`;
+        return;
+      }
+      // จัดกลุ่มตามความเร่งด่วน (เรียงในกลุ่มตามที่เลือกไว้)
+      const g = {};
+      items.forEach(t => { const k = groupOf(t); (g[k] = g[k] || []).push(t); });
+      el.innerHTML = ['overdue', 'week', 'next', 'nodue', 'done']
+        .filter(k => g[k] && g[k].length)
+        .map(k => groupBlockHtml(k, g[k])).join('');
     }
 
     /* ---------- refresh ---------- */
@@ -2121,14 +2250,16 @@
     }
     function histOpenSet() { return histOpen ? Object.assign({}, histOpen) : {}; }
 
-    function historyRowHtml(t) {
+    function historyRowHtml(t, from) {
       const late = isLateDone(t);
       const d = doneDate(t);
       const when = d ? d.toLocaleDateString('th-TH', { day: 'numeric', month: 'short' }) : '-';
-      return `<div class="hist-row" onclick="openTask('${t.TaskID}','user')">
+      const who = (from === 'tasks' && t.AssigneeName) ? `<span class="d" style="max-width:78px;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(t.AssigneeName)}</span>` : '';
+      return `<div class="hist-row" onclick="openTask('${t.TaskID}','${from || 'user'}')">
           <span class="dot" style="background:${late ? 'var(--rose-fg)' : 'var(--mint-fg)'}"></span>
           <span class="t">${escapeHtml(t.Title || '')}</span>
           ${late ? '<span class="badge b-overdue" style="font-size:10px;">สาย</span>' : ''}
+          ${who}
           <span class="d">${when}</span>
         </div>`;
     }
