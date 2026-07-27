@@ -276,6 +276,9 @@
     .hist-row .t { flex-grow: 1; min-width: 0; font-size: 12.5px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .hist-row .d { font-size: 11px; color: var(--muted); white-space: nowrap; }
     .hist-row .dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+    /* ---- ชิปโครงการที่ประจำ (หัวการ์ดหน้างานรายคน) ---- */
+    .proj-chip { display: inline-flex; align-items: center; gap: 5px; max-width: 168px; font-size: 11px; font-weight: 600; padding: 4px 9px; border-radius: 8px; background: var(--primary-soft, var(--grey-soft)); color: var(--primary-fg); }
+    .proj-chip span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .section-title i { color: var(--primary-fg); }
 
     /* task detail */
@@ -483,10 +486,11 @@
       <div style="padding: 0 24px;">
         <div class="card row">
           <div class="avatar" id="u-avatar"></div>
-          <div>
+          <div style="min-width:0;">
             <h3 id="u-name" style="margin:0; font-size:17px;"></h3>
             <p id="u-role" style="margin:2px 0 0; font-size:11.5px; color:var(--muted);"></p>
           </div>
+          <div id="u-projects" style="margin-left:auto; display:flex; flex-direction:column; align-items:flex-end; gap:4px; min-width:0;"></div>
         </div>
         <div id="u-kpi"></div>
         <div class="section-title"><i class="fa-solid fa-clipboard-list"></i>รายการงาน</div>
@@ -2054,6 +2058,17 @@
     /* ---------- shared task card ---------- */
     function taskCard(t, showOwner, from) {
       const s = statusMeta(t);
+      // หน้างานรายคน + ประจำโครงการเดียว → ไม่ต้องซ้ำชื่อโครงการในทุกการ์ด (อยู่บนหัวแล้ว)
+      const hideProject = (from === 'user') && userSingleProject && !showOwner;
+      if (hideProject) return `
+        <div class="task-item" style="border-left-color:${s.color}" onclick="openTask('${t.TaskID}','${from}')">
+          <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px;">
+            <h4>${escapeHtml(t.Title||'')}</h4>
+            <div style="display:flex; gap:6px; flex-shrink:0; flex-wrap:wrap; justify-content:flex-end;">${prioBadge(t.Priority)}<span class="badge ${s.cls}"><i class="fa-solid ${s.icon}"></i>${s.label}</span></div>
+          </div>
+          <p class="meta" style="margin:4px 0 0;"><i class="fa-solid fa-calendar-day"></i>กำหนดจบ ${t.DueDate || '-'} · ${dueLabel(t)}</p>
+          <div class="prog-bg"><div class="prog-fill" style="width:${t.Progress}%; background:${s.color}"></div></div>
+        </div>`;
       return `
         <div class="task-item" style="border-left-color:${s.color}" onclick="openTask('${t.TaskID}','${from}')">
           <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px;">
@@ -2084,7 +2099,7 @@
     }
 
     /* ---------- ประวัติงาน: แถวบาง + กลุ่มตามเดือน + ตัวกรอง ---------- */
-    let viewUserId = null, histFilter = 'all', histOpen = null;
+    let viewUserId = null, histFilter = 'all', histOpen = null, userSingleProject = false;
 
     // ส่งช้าไหม — ใช้ตรรกะเดียวกับที่คิด KPI (ไม่มีเวลาปิดงาน = ถือว่าตรงเวลา)
     function isLateDone(t) {
@@ -2124,6 +2139,19 @@
       const my = appData.tasks.filter(t => t.AssigneeID === userId && !isCancelled(t));
       const active = my.filter(t => !isDone(t));
       const doneAll = my.filter(isDone);
+
+      /* โครงการที่ประจำ — ขึ้นเป็นชิปข้างชื่อ แล้วตัดบรรทัดโครงการออกจากการ์ดงาน
+         ถ้ามีหลายโครงการ ยังต้องโชว์ในการ์ดด้วย ไม่งั้นแยกไม่ออกว่างานไหนของโครงการไหน */
+      const projActive = [...new Set(active.map(t => (t.Project || '').trim()).filter(Boolean))];
+      const projAll = [...new Set(my.map(t => (t.Project || '').trim()).filter(Boolean))];
+      const projs = projActive.length ? projActive : projAll;
+      userSingleProject = projs.length === 1;
+      const pw = document.getElementById('u-projects');
+      if (pw) {
+        pw.innerHTML = projs.slice(0, 2).map(p =>
+          `<span class="proj-chip"><i class="fa-solid fa-diagram-project"></i><span>${escapeHtml(p)}</span></span>`).join('')
+          + (projs.length > 2 ? `<span class="meta" style="font-size:10.5px;">+${projs.length - 2} โครงการ</span>` : '');
+      }
 
       let h = active.length ? active.map(t => taskCard(t, false, 'user')).join('') : emptyBox('ไม่มีงานค้าง 🎉', 'fa-circle-check');
 
