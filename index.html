@@ -259,6 +259,23 @@
     .empty i { font-size: 32px; color: #cdd6e6; display: block; margin-bottom: 12px; }
 
     .section-title { font-size: 14px; font-weight: 600; margin: 6px 0 12px; display: flex; align-items: center; gap: 7px; }
+    /* ---- ประวัติงาน: แถวบาง + กลุ่มตามเดือน ---- */
+    .hist-chips { display: flex; gap: 7px; margin: 0 0 10px; flex-wrap: wrap; }
+    .hist-chip { font-size: 11.5px; font-weight: 500; padding: 5px 11px; border-radius: 999px; background: var(--card); color: var(--muted); border: 1px solid var(--border); cursor: pointer; white-space: nowrap; }
+    .hist-chip.active { background: var(--primary); color: var(--primary-fg); border-color: transparent; font-weight: 600; }
+    .hist-mo { background: var(--card); border-radius: 12px; box-shadow: var(--shadow); margin-bottom: 8px; overflow: hidden; }
+    .hist-mo-head { display: flex; align-items: center; gap: 8px; padding: 10px 13px; cursor: pointer; }
+    .hist-mo-head h4 { margin: 0; font-size: 13px; font-weight: 600; flex-grow: 1; }
+    .hist-mo-head .sum { font-size: 11px; color: var(--muted); white-space: nowrap; }
+    .hist-mo-head .chev { color: var(--muted); font-size: 11px; transition: transform .15s; }
+    .hist-mo.open .hist-mo-head .chev { transform: rotate(90deg); }
+    .hist-body { border-top: 1px solid var(--border); }
+    .hist-row { display: flex; align-items: center; gap: 9px; padding: 8px 13px; cursor: pointer; border-bottom: 1px solid var(--border); }
+    .hist-row:last-child { border-bottom: none; }
+    .hist-row:active { background: var(--grey-soft); }
+    .hist-row .t { flex-grow: 1; min-width: 0; font-size: 12.5px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .hist-row .d { font-size: 11px; color: var(--muted); white-space: nowrap; }
+    .hist-row .dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
     .section-title i { color: var(--primary-fg); }
 
     /* task detail */
@@ -1290,6 +1307,7 @@
     /* ---------- render all ---------- */
     function renderAll() {
       renderDashboard(); renderTasks(); renderTeam();
+      if (viewUserId) renderUserTasks();   // หน้างานรายคนเปิดอยู่ → อัปเดตตามไปด้วย
       // ส่งงานของฉันเข้า Google Calendar (หน่วงและข้ามงานที่ไม่เปลี่ยน — ไม่กระทบความเร็วหน้าจอ)
       if (window.GCAL) GCAL.autoSync(appData.tasks, myUserId, sessionEmail);
     }
@@ -2058,17 +2076,109 @@
       document.getElementById('u-name').innerText = viewUser.Name || '';
       document.getElementById('u-role').innerHTML = escapeHtml(viewUser.Role || '') + (viewUser.Status ? ' · <span style="color:var(--primary-fg);">' + escapeHtml(viewUser.Status) + '</span>' : '');
       document.getElementById('u-kpi').innerHTML = isBoss ? kpiCardHtml(userId) : '';
-      const my = appData.tasks.filter(t => t.AssigneeID === userId && !isCancelled(t));
-      const active = my.filter(t => !isDone(t));
-      const done = my.filter(isDone);
-      let h = active.length ? active.map(t => taskCard(t, false, 'user')).join('') : emptyBox('ไม่มีงานค้าง 🎉', 'fa-circle-check');
-      if (done.length) {
-        h += `<div class="section-title" style="margin:18px 0 10px;"><i class="fa-solid fa-clock-rotate-left" style="color:var(--mint-fg);"></i>ประวัติงานที่เสร็จแล้ว (${done.length})</div>`;
-        h += done.map(t => taskCard(t, false, 'user')).join('');
-      }
-      document.getElementById('u-task-list').innerHTML = h;
+      viewUserId = userId;
+      histFilter = 'all';
+      histOpen = null;   // null = ยังไม่เคยกด → กางเดือนล่าสุดให้เดือนเดียว
+      renderUserTasks();
       showScreen('screen-user');
     }
+
+    /* ---------- ประวัติงาน: แถวบาง + กลุ่มตามเดือน + ตัวกรอง ---------- */
+    let viewUserId = null, histFilter = 'all', histOpen = null;
+
+    // ส่งช้าไหม — ใช้ตรรกะเดียวกับที่คิด KPI (ไม่มีเวลาปิดงาน = ถือว่าตรงเวลา)
+    function isLateDone(t) {
+      if (!t.CompletedAt) return false;
+      const due = parseDMY(t.DueDate); if (!due) return false;
+      due.setHours(23, 59, 59, 999);
+      return new Date(t.CompletedAt) > due;
+    }
+    function doneDate(t) {
+      const d = t.CompletedAt ? new Date(t.CompletedAt) : parseDMY(t.DueDate);
+      return (d && !isNaN(d)) ? d : null;
+    }
+    function setHistFilter(f) { histFilter = f; renderUserTasks(); }
+    function toggleHistMonth(key) {
+      const set = histOpenSet();
+      if (set[key]) delete set[key]; else set[key] = 1;
+      histOpen = set;
+      renderUserTasks();
+    }
+    function histOpenSet() { return histOpen ? Object.assign({}, histOpen) : {}; }
+
+    function historyRowHtml(t) {
+      const late = isLateDone(t);
+      const d = doneDate(t);
+      const when = d ? d.toLocaleDateString('th-TH', { day: 'numeric', month: 'short' }) : '-';
+      return `<div class="hist-row" onclick="openTask('${t.TaskID}','user')">
+          <span class="dot" style="background:${late ? 'var(--rose-fg)' : 'var(--mint-fg)'}"></span>
+          <span class="t">${escapeHtml(t.Title || '')}</span>
+          ${late ? '<span class="badge b-overdue" style="font-size:10px;">สาย</span>' : ''}
+          <span class="d">${when}</span>
+        </div>`;
+    }
+
+    function renderUserTasks() {
+      const userId = viewUserId;
+      if (!userId) return;
+      const my = appData.tasks.filter(t => t.AssigneeID === userId && !isCancelled(t));
+      const active = my.filter(t => !isDone(t));
+      const doneAll = my.filter(isDone);
+
+      let h = active.length ? active.map(t => taskCard(t, false, 'user')).join('') : emptyBox('ไม่มีงานค้าง 🎉', 'fa-circle-check');
+
+      if (doneAll.length) {
+        const lateCount = doneAll.filter(isLateDone).length;
+        const now = new Date();
+        const thisKey = now.getFullYear() + '-' + now.getMonth();
+
+        // กรอง
+        let done = doneAll;
+        if (histFilter === 'late') done = doneAll.filter(isLateDone);
+        else if (histFilter === 'month') done = doneAll.filter(t => {
+          const d = doneDate(t); return d && (d.getFullYear() + '-' + d.getMonth()) === thisKey;
+        });
+
+        h += `<div class="section-title" style="margin:18px 0 10px;"><i class="fa-solid fa-clock-rotate-left" style="color:var(--mint-fg);"></i>ประวัติงานที่เสร็จแล้ว (${doneAll.length})</div>`;
+        h += `<div class="hist-chips">
+            <span class="hist-chip ${histFilter === 'all' ? 'active' : ''}" onclick="setHistFilter('all')">ทั้งหมด ${doneAll.length}</span>
+            <span class="hist-chip ${histFilter === 'late' ? 'active' : ''}" onclick="setHistFilter('late')">ส่งสาย ${lateCount}</span>
+            <span class="hist-chip ${histFilter === 'month' ? 'active' : ''}" onclick="setHistFilter('month')">เดือนนี้</span>
+          </div>`;
+
+        if (!done.length) {
+          h += `<p class="meta" style="margin:0 0 8px 4px;">${histFilter === 'late' ? 'ไม่มีงานที่ส่งสาย 👍' : 'ไม่มีงานเสร็จในเดือนนี้'}</p>`;
+        } else {
+          // จัดกลุ่มตามเดือน เรียงใหม่→เก่า
+          const groups = {};
+          done.forEach(t => {
+            const d = doneDate(t);
+            const key = d ? (d.getFullYear() + '-' + pad2(d.getMonth())) : 'ไม่ระบุ';
+            (groups[key] = groups[key] || []).push(t);
+          });
+          const keys = Object.keys(groups).sort().reverse();
+          const openSet = histOpen || (keys.length ? { [keys[0]]: 1 } : {});   // ค่าเริ่มต้น: กางเดือนล่าสุด
+          keys.forEach(key => {
+            const items = groups[key].slice().sort((a, b) => (doneDate(b) || 0) - (doneDate(a) || 0));
+            const lateN = items.filter(isLateDone).length;
+            const label = key === 'ไม่ระบุ' ? 'ไม่ระบุวันที่'
+              : new Date(parseInt(key.split('-')[0]), parseInt(key.split('-')[1]), 1)
+                  .toLocaleDateString('th-TH', { month: 'long', year: 'numeric' });
+            const open = !!openSet[key];
+            h += `<div class="hist-mo ${open ? 'open' : ''}">
+                <div class="hist-mo-head" onclick="toggleHistMonth('${key}')">
+                  <i class="fa-solid fa-chevron-right chev"></i>
+                  <h4>${label}</h4>
+                  <span class="sum">เสร็จ ${items.length}${lateN ? ' · <span style="color:var(--rose-fg);font-weight:600;">สาย ' + lateN + '</span>' : ''}</span>
+                </div>
+                ${open ? `<div class="hist-body">${items.map(historyRowHtml).join('')}</div>` : ''}
+              </div>`;
+          });
+        }
+      }
+      document.getElementById('u-task-list').innerHTML = h;
+    }
+    function pad2(n) { return String(n).padStart(2, '0'); }
     function kpiCardHtml(userId) {
       const m = computeMetrics(userId), k = kpiMeta(m.kpi), badges = computeBadges(userId);
       return `
