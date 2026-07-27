@@ -75,7 +75,7 @@ $$;
 -- ขอบเขต "คนที่ฉันเห็นชื่อได้" = manage_scope + หัวหน้าของฉัน (ไว้แสดงชื่อในคอมเมนต์)
 create or replace function visible_users() returns setof uuid
 language sql security definer stable as $$
-  select id from manage_scope()
+  select * from manage_scope()
   union
   select manager_id from me_row() where manager_id is not null
 $$;
