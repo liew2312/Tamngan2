@@ -78,38 +78,64 @@
   }
   const USER_COLORS = ['#5b82e0', '#e8536e', '#e8942f', '#22a97a', '#a06ddb', '#3fa9c4', '#e07b9a'];
 
+  /* ถ้าเขียนข้อมูลไม่ผ่าน ให้แนบ "สิทธิ์ที่เซิร์ฟเวอร์มองเห็น" ไปกับข้อความ error
+     จะได้ไม่ต้องเดาว่าติดที่ตัวตนหรือที่สิทธิ์ */
+  SB.whoami = async () => {
+    try {
+      const { data, error } = await SB.client.rpc('whoami');
+      if (error) return null;
+      return Array.isArray(data) ? data[0] : data;
+    } catch (e) { return null; }
+  };
+  async function withWhoami(error) {
+    const msg = (error && (error.message || error.hint)) || String(error);
+    // ยังไม่ได้รันไฟล์ SQL → บอกให้ชัด แทนที่จะโยน error ดิบ
+    if (/tn_add_user|tn_update_user|tn_delete_user|whoami/.test(msg) && /does not exist|schema cache|404/i.test(msg)) {
+      return new Error('ยังไม่ได้ติดตั้งฟังก์ชันฝั่งเซิร์ฟเวอร์ — ให้รันไฟล์ supabase-patch-teams-fix2.sql ใน Supabase SQL Editor ก่อน');
+    }
+    const w = await SB.whoami();
+    if (!w) return new Error(msg);
+    return new Error(msg + '\n\n[สิทธิ์ที่เซิร์ฟเวอร์เห็น] อีเมล: ' + (w.session_email || '(ว่าง)')
+      + ' · พบบัญชี: ' + (w.found ? 'ใช่' : 'ไม่พบ')
+      + ' · แอดมิน: ' + (w.admin ? 'ใช่' : 'ไม่')
+      + ' · หัวหน้า: ' + (w.boss ? 'ใช่' : 'ไม่'));
+  }
+
   /* ---------- ตัวจัดการ action (args[0] = อีเมลจาก srv, ไม่ใช้ในโหมดนี้) ---------- */
   const H = {
     fetchAppData: () => fetchAll(),
 
     // a = [name, role, email, managerId?, isBoss?]
-    //  - หัวหน้างานทั่วไป: managerId/isBoss ถูก trigger บังคับทับเป็น (ตัวเอง, false) เสมอ
-    //  - แอดมิน: เลือกสังกัดได้ และตั้งเป็นหัวหน้างานคนใหม่ได้ (managerId = '' → หัวหน้าอิสระ)
+    //  เขียนผ่าน RPC tn_add_user — ฟังก์ชันตรวจสิทธิ์เองและบอกเหตุผลเป็นภาษาไทย
     addUser: async (a) => {
-      const asBoss = !!a[4];
-      let mgr = a[3] || null;
-      if (!asBoss && !mgr) { try { mgr = await meId(); } catch (e) { mgr = null; } }
-      if (asBoss) mgr = a[3] || null;
-      const rec = {
-        name: a[0], role: a[1] || 'ทีมงาน', email: (a[2] || '').toLowerCase() || null,
-        is_boss: asBoss, is_admin: false, manager_id: mgr, active: true,
-        color: USER_COLORS[Math.floor(Math.random() * USER_COLORS.length)]
-      };
-      const { data, error } = await SB.client.from('app_users').insert(rec).select().single();
-      if (error) throw error; const o = uUser(data); o.tasks = []; return o;
+      const { data, error } = await SB.client.rpc('tn_add_user', {
+        p_name: a[0],
+        p_role: a[1] || 'ทีมงาน',
+        p_email: (a[2] || '').toLowerCase() || null,
+        p_manager: a[3] || null,
+        p_is_boss: !!a[4]
+      });
+      if (error) throw await withWhoami(error);
+      const row = Array.isArray(data) ? data[0] : data;
+      const o = uUser(row); o.tasks = []; return o;
     },
-    // a = [id, name, role, email, isBoss, active, managerId?]
+    // a = [id, name, role, email, isBoss, active, managerId?]  (ส่ง index 6 เฉพาะแอดมิน)
     updateMember: async (a) => {
-      const patch = { name: a[1], role: a[2] || 'ทีมงาน', email: (a[3] || '').toLowerCase() || null, is_boss: !!a[4], active: !!a[5] };
-      if (a.length > 6) patch.manager_id = a[6] || null;   // แอดมินเท่านั้นที่ส่งค่านี้มา
-      const { data, error } = await SB.client.from('app_users').update(patch).eq('id', a[0]).select().single();
-      if (error) throw error; return uUser(data);
+      const setMgr = a.length > 6;
+      const { data, error } = await SB.client.rpc('tn_update_user', {
+        p_id: a[0], p_name: a[1], p_role: a[2] || 'ทีมงาน',
+        p_email: (a[3] || '').toLowerCase() || null,
+        p_is_boss: !!a[4], p_active: !!a[5],
+        p_manager: setMgr ? (a[6] || null) : null,
+        p_set_manager: setMgr
+      });
+      if (error) throw await withWhoami(error);
+      return uUser(Array.isArray(data) ? data[0] : data);
     },
     deleteMember: async (a) => {
-      const { count } = await SB.client.from('tasks').select('id', { count: 'exact', head: true }).eq('assignee', a[0]);
-      if (count && count > 0) throw new Error('ลบไม่ได้ ยังมีงานอยู่ ' + count + ' งาน — ย้ายผู้รับผิดชอบหรือลบงานก่อน (หรือปิดการใช้งานแทน)');
-      const { error } = await SB.client.from('app_users').delete().eq('id', a[0]);
-      if (error) throw error; return true;
+      const { error } = await SB.client.rpc('tn_delete_user', { p_id: a[0] });
+      if (error) throw await withWhoami(error);
+      return true;
     },
     updateProfile: async (a) => {
       const id = await meId();

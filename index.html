@@ -25,7 +25,8 @@
     // โหลด supabase-js เฉพาะเมื่อกรอกค่าไว้ (ไม่กรอก = ใช้ Apps Script ตามเดิม)
     if (window.SUPABASE_URL && window.SUPABASE_ANON_KEY) {
       document.write('<scr' + 'ipt src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"><\/scr' + 'ipt>');
-      document.write('<scr' + 'ipt src="supabase-client.js"><\/scr' + 'ipt>');
+      // ?v= กัน service worker เสิร์ฟไฟล์เก่า (แก้เลขนี้ทุกครั้งที่แก้ supabase-client.js)
+      document.write('<scr' + 'ipt src="supabase-client.js?v=20260727c"><\/scr' + 'ipt>');
     }
   </script>
   <!-- PWA -->
