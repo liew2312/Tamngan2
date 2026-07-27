@@ -14,6 +14,10 @@
     /* ===== Supabase (ถ้าจะย้ายมาใช้ Supabase ให้ใส่ค่า 2 บรรทัดนี้; ใส่แล้วจะใช้ Supabase แทน Apps Script อัตโนมัติ) ===== */
     window.SUPABASE_URL = "https://cfocrjczeixpwdjlhqxv.supabase.co";       // เช่น https://cfocrjczeixpwdjlhqxv.supabase.co
     window.SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNmb2NyamN6ZWl4cHdkamxocXh2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM4NjU4MjAsImV4cCI6MjA5OTQ0MTgyMH0.DX7tyh1hIVz6DNTF-fC-NBPBX68ZkEyCJgdS50bVM9o";  // anon public key
+
+    /* ===== Google Calendar (ไม่ใส่ = ปิดฟีเจอร์นี้ แอปทำงานปกติทุกอย่าง) =====
+       วิธีเอา Client ID: ดู README-gcal.md — ลงท้ายด้วย .apps.googleusercontent.com */
+    window.GOOGLE_CLIENT_ID = "1095428817033-ja48rjiqnalqaej6hnrav67im0q5frem.apps.googleusercontent.com";
   </script>
   <script>
     /* ใช้ธีมที่เลือกไว้ตั้งแต่ก่อน render (กันสีเดิมกระพริบ) */
@@ -27,6 +31,11 @@
       document.write('<scr' + 'ipt src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"><\/scr' + 'ipt>');
       // ?v= กัน service worker เสิร์ฟไฟล์เก่า (แก้เลขนี้ทุกครั้งที่แก้ supabase-client.js)
       document.write('<scr' + 'ipt src="supabase-client.js?v=20260727c"><\/scr' + 'ipt>');
+    }
+    // Google Calendar — โหลดเฉพาะเมื่อใส่ Client ID ไว้
+    if (window.GOOGLE_CLIENT_ID) {
+      document.write('<scr' + 'ipt src="https://accounts.google.com/gsi/client" async defer><\/scr' + 'ipt>');
+      document.write('<scr' + 'ipt src="gcal.js?v=20260727c"><\/scr' + 'ipt>');
     }
   </script>
   <!-- PWA -->
@@ -697,6 +706,25 @@
     </div>
   </div>
 
+  <!-- Google Calendar modal -->
+  <div id="modal-gcal" class="backdrop modal-wrap hidden" onclick="if(event.target===this)closeOverlay('modal-gcal')">
+    <div class="modal">
+      <h3><i class="fa-regular fa-calendar-check"></i>Google Calendar</h3>
+      <p class="sub">ส่ง "งานของฉัน" ที่มีกำหนดส่ง เข้าปฏิทิน Google ของคุณเอง — ทางเดียว แก้ในแอปแล้วปฏิทินอัปเดตตาม</p>
+      <div class="card" style="padding:12px 14px; margin-bottom:14px;">
+        <p id="gcal-status" style="margin:0; font-size:13px; font-weight:600;"></p>
+        <p id="gcal-hint" class="meta" style="margin:6px 0 0; line-height:1.6;"></p>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" onclick="closeOverlay('modal-gcal')">ปิด</button>
+        <button class="btn btn-primary" id="gcal-main-btn" onclick="gcalMainAction()"></button>
+      </div>
+      <div style="text-align:center; margin-top:14px;" id="gcal-off-wrap">
+        <button onclick="gcalDisconnect()" style="background:none; border:none; color:var(--rose-fg); font-family:inherit; font-size:13px; font-weight:500; cursor:pointer;"><i class="fa-solid fa-link-slash"></i> ยกเลิกการเชื่อมต่อ (ลบงานที่ส่งไปแล้วออกจากปฏิทิน)</button>
+      </div>
+    </div>
+  </div>
+
   <!-- edit member modal (หัวหน้า) -->
   <div id="modal-edit-member" class="backdrop modal-wrap hidden" onclick="if(event.target===this)closeOverlay('modal-edit-member')">
     <div class="modal">
@@ -761,7 +789,7 @@
     let isAdmin = false;      // ผู้ดูแลระบบ — เห็นทุกทีม สร้างหัวหน้างานได้
     let currentUser = null;   // ข้อมูลผู้ใช้ปัจจุบัน (คนที่ล็อกอิน)
     const PASTEL = ['#5b82e0','#e8536e','#e8942f','#22a97a','#a06ddb','#3fa9c4','#e07b9a'];
-    const APP_VERSION = '2.1';
+    const APP_VERSION = '2.2';
 
     /* อัปเดตเวอร์ชัน / เคลียร์แคช: ถอน service worker + ล้าง cache แล้วโหลดใหม่ */
     async function clearCacheUpdate() {
@@ -1015,7 +1043,9 @@
         });
     }
     function logout() {
-      ssDel('tt_email'); sessionEmail = ''; myUserId = null; isBoss = false; currentUser = null;
+      ssDel('tt_email'); sessionEmail = ''; myUserId = null; isBoss = false; isAdmin = false; currentUser = null;
+      // ล้างสถานะปฏิทินของคนก่อนหน้า กันซิงก์งานผิดบัญชีเมื่อสลับผู้ใช้บนเครื่องเดียวกัน
+      try { if (window.GCAL) GCAL.disconnect(); } catch (e) {}
       appStarted = false; appLoading = false; loadRetries = 0; todosCache = null;
       if (SB_MODE()) { try { window.SB.signOut(); } catch (e) {} }
       closeOverlay('modal-profile');
@@ -1258,7 +1288,11 @@
     }
 
     /* ---------- render all ---------- */
-    function renderAll() { renderDashboard(); renderTasks(); renderTeam(); }
+    function renderAll() {
+      renderDashboard(); renderTasks(); renderTeam();
+      // ส่งงานของฉันเข้า Google Calendar (หน่วงและข้ามงานที่ไม่เปลี่ยน — ไม่กระทบความเร็วหน้าจอ)
+      if (window.GCAL) GCAL.autoSync(appData.tasks, myUserId, sessionEmail);
+    }
 
     /* ---------- dashboard ---------- */
     function setFilter(f) {
@@ -1833,11 +1867,56 @@
       if (isBoss) items.push({ ico: 'fa-ranking-star', bg: 'var(--amber)', t: 'Leaderboard', s: 'อันดับคะแนน KPI', fn: "setPerfTab('rank'); switchTab('performance')" });
       items.push({ ico: 'fa-id-badge', bg: 'var(--primary-fg)', t: 'โปรไฟล์ของฉัน', s: (currentUser && currentUser.Email) || '', fn: "openProfile()" });
       items.push({ ico: 'fa-palette', bg: 'var(--mint)', t: 'ธีมสี', s: 'AP คลาสสิก · พาสเทล · มินิมอล', fn: "openThemeModal()" });
+      if (window.GCAL && GCAL.available() && myUserId) {
+        const on = GCAL.isEnabled();
+        items.push({ ico: 'fa-calendar-check', bg: on ? 'var(--mint)' : 'var(--amber)', t: 'Google Calendar',
+                     s: on ? ('เชื่อมแล้ว · ' + GCAL.lastSyncText()) : 'ส่งงานของฉันเข้าปฏิทิน Google', fn: "openGcal()" });
+      }
       items.push({ ico: 'fa-rotate', bg: 'var(--amber)', t: 'อัปเดต / เคลียร์แคช', s: 'ดึงเวอร์ชันล่าสุด (เวอร์ชัน ' + APP_VERSION + ')', fn: "clearCacheUpdate()" });
       items.push({ ico: 'fa-right-from-bracket', bg: 'var(--rose)', t: 'ออกจากระบบ', s: '', fn: "logout()" });
       document.getElementById('more-list').innerHTML = items.map(it =>
         `<div class="more-item" onclick="${it.fn}"><div class="mi-ico" style="background:${it.bg}"><i class="fa-solid ${it.ico}"></i></div><div style="flex-grow:1;"><h4>${it.t}</h4>${it.s ? `<p class="meta" style="margin:2px 0 0;">${it.s}</p>` : ''}</div><i class="fa-solid fa-chevron-right" style="color:var(--muted);"></i></div>`).join('');
     }
+    /* ---------- Google Calendar ---------- */
+    function gcalRefreshModal() {
+      const on = window.GCAL && GCAL.isEnabled();
+      const mine = appData.tasks.filter(t => t.AssigneeID === myUserId && t.DueDate && t.Status !== 'ยกเลิก');
+      document.getElementById('gcal-status').innerHTML = on
+        ? '<i class="fa-solid fa-circle-check" style="color:var(--mint-fg);"></i> เชื่อมต่อแล้ว — ' + GCAL.lastSyncText()
+        : '<i class="fa-solid fa-circle-info" style="color:var(--amber-fg);"></i> ยังไม่ได้เชื่อมต่อ';
+      document.getElementById('gcal-hint').innerText = on
+        ? 'งานของคุณที่มีกำหนดส่งตอนนี้ ' + mine.length + ' รายการ · ระบบจะซิงก์ให้อัตโนมัติทุกครั้งที่เปิดแอปหรือมีงานเปลี่ยน'
+        : 'จะขึ้นเป็นงานทั้งวันในวันกำหนดส่ง เห็นเฉพาะคุณคนเดียว · งานที่ยกเลิกจะถูกลบออกจากปฏิทินให้';
+      document.getElementById('gcal-main-btn').innerHTML = on
+        ? '<i class="fa-solid fa-rotate"></i> ซิงก์ตอนนี้' : '<i class="fa-brands fa-google"></i> เชื่อมต่อปฏิทิน';
+      document.getElementById('gcal-off-wrap').classList.toggle('hidden', !on);
+    }
+    function openGcal() { gcalRefreshModal(); document.getElementById('modal-gcal').classList.remove('hidden'); }
+    async function gcalMainAction() {
+      const btn = document.getElementById('gcal-main-btn');
+      const old = btn.innerHTML;
+      btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> กำลังทำงาน...';
+      try {
+        const first = !GCAL.isEnabled();
+        if (first) await GCAL.connect(sessionEmail);
+        const r = await GCAL.sync(appData.tasks, myUserId, { email: sessionEmail, force: first });
+        gcalRefreshModal(); renderMore();
+        if (r.failed) alert('ซิงก์เสร็จบางส่วน — สำเร็จ ' + r.added + ' · ไม่สำเร็จ ' + r.failed + '\n' + (r.errors[0] || ''));
+        else toastOk('ซิงก์ปฏิทินแล้ว (' + r.added + ' รายการ' + (r.removed ? ', ลบ ' + r.removed : '') + ')');
+      } catch (e) {
+        alert('เชื่อมปฏิทินไม่สำเร็จ: ' + (e && e.message || e));
+      } finally {
+        btn.disabled = false; btn.innerHTML = old; gcalRefreshModal();
+      }
+    }
+    async function gcalDisconnect() {
+      if (!confirm('ยกเลิกการเชื่อมต่อ และลบงานที่แอปส่งไปออกจากปฏิทิน Google?')) return;
+      try { await GCAL.purge(sessionEmail); } catch (e) {}
+      GCAL.disconnect();
+      gcalRefreshModal(); renderMore();
+      toastOk('ยกเลิกการเชื่อมต่อแล้ว');
+    }
+
     function relTime(iso) {
       if (!iso) return 'ยังไม่เคยเข้า';
       const d = new Date(iso); if (isNaN(d)) return '-';
