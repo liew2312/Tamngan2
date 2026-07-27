@@ -18,7 +18,7 @@
   const pad = n => String(n).padStart(2, '0');
   function dbToDMY(d) { if (!d) return ''; const p = String(d).slice(0, 10).split('-'); return p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : ''; }
   function dmyToDb(s) { if (!s) return null; const p = String(s).split('/'); return p.length === 3 ? `${p[2]}-${pad(p[1])}-${pad(p[0])}` : null; }
-  function uUser(r) { return { UserID: r.id, Name: r.name, Role: r.role, Email: r.email || '', Color: r.color, IsBoss: r.is_boss ? 'TRUE' : '', Photo: r.photo || '', Status: r.status || '', Active: r.active === false ? 'FALSE' : 'TRUE', LastLogin: r.last_login || '' }; }
+  function uUser(r) { return { UserID: r.id, Name: r.name, Role: r.role, Email: r.email || '', Color: r.color, IsBoss: r.is_boss ? 'TRUE' : '', IsAdmin: r.is_admin ? 'TRUE' : '', ManagerID: r.manager_id || '', Photo: r.photo || '', Status: r.status || '', Active: r.active === false ? 'FALSE' : 'TRUE', LastLogin: r.last_login || '' }; }
   function uTask(r) { return { TaskID: r.id, Project: r.project || '', Title: r.title || '', Description: r.description || '', AssigneeID: r.assignee || '', DueDate: dbToDMY(r.due_date), Status: r.status || 'ยังไม่เริ่ม', Progress: parseInt(r.progress) || 0, Priority: r.priority || 'ปกติ', CompletedAt: r.completed_at || '', CreatedAt: r.created_at || '', comments: [], dueLog: [] }; }
 
   /* ---------- Auth (อีเมล: กดลิงก์ หรือกรอกรหัส) ---------- */
@@ -64,16 +64,16 @@
     const meRow = (u.data || []).find(r => (r.email || '').toLowerCase() === email);
     SB.me = meRow ? uUser(meRow) : null;
     const currentUser = meRow
-      ? { UserID: meRow.id, Name: meRow.name, Role: meRow.role, Email: meRow.email, Photo: meRow.photo || '', Status: meRow.status || '', active: meRow.active !== false, isBoss: !!meRow.is_boss, registered: true }
-      : { UserID: null, Name: email, Email: email, isBoss: false, registered: false };
+      ? { UserID: meRow.id, Name: meRow.name, Role: meRow.role, Email: meRow.email, Photo: meRow.photo || '', Status: meRow.status || '', active: meRow.active !== false, isBoss: !!meRow.is_boss || !!meRow.is_admin, isAdmin: !!meRow.is_admin, managerId: meRow.manager_id || '', registered: true }
+      : { UserID: null, Name: email, Email: email, isBoss: false, isAdmin: false, registered: false };
     return { users, tasks, currentUser };
   }
 
   async function meId() {
     if (SB.me && SB.me.UserID) return SB.me.UserID;
     const email = (await SB.getSessionEmail()).toLowerCase();
-    const { data } = await SB.client.from('app_users').select('id,name,is_boss').eq('email', email).limit(1);
-    if (data && data[0]) { SB.me = { UserID: data[0].id, Name: data[0].name, IsBoss: data[0].is_boss ? 'TRUE' : '' }; return data[0].id; }
+    const { data } = await SB.client.from('app_users').select('id,name,is_boss,is_admin,manager_id').eq('email', email).limit(1);
+    if (data && data[0]) { SB.me = { UserID: data[0].id, Name: data[0].name, IsBoss: (data[0].is_boss || data[0].is_admin) ? 'TRUE' : '', IsAdmin: data[0].is_admin ? 'TRUE' : '', ManagerID: data[0].manager_id || '' }; return data[0].id; }
     throw new Error('บัญชีของคุณยังไม่ได้ลงทะเบียนในระบบ');
   }
   const USER_COLORS = ['#5b82e0', '#e8536e', '#e8942f', '#22a97a', '#a06ddb', '#3fa9c4', '#e07b9a'];
@@ -82,13 +82,26 @@
   const H = {
     fetchAppData: () => fetchAll(),
 
+    // a = [name, role, email, managerId?, isBoss?]
+    //  - หัวหน้างานทั่วไป: managerId/isBoss ถูก trigger บังคับทับเป็น (ตัวเอง, false) เสมอ
+    //  - แอดมิน: เลือกสังกัดได้ และตั้งเป็นหัวหน้างานคนใหม่ได้ (managerId = '' → หัวหน้าอิสระ)
     addUser: async (a) => {
-      const rec = { name: a[0], role: a[1] || 'ทีมงาน', email: (a[2] || '').toLowerCase() || null, is_boss: false, active: true, color: USER_COLORS[Math.floor(Math.random() * USER_COLORS.length)] };
+      const asBoss = !!a[4];
+      let mgr = a[3] || null;
+      if (!asBoss && !mgr) { try { mgr = await meId(); } catch (e) { mgr = null; } }
+      if (asBoss) mgr = a[3] || null;
+      const rec = {
+        name: a[0], role: a[1] || 'ทีมงาน', email: (a[2] || '').toLowerCase() || null,
+        is_boss: asBoss, is_admin: false, manager_id: mgr, active: true,
+        color: USER_COLORS[Math.floor(Math.random() * USER_COLORS.length)]
+      };
       const { data, error } = await SB.client.from('app_users').insert(rec).select().single();
       if (error) throw error; const o = uUser(data); o.tasks = []; return o;
     },
+    // a = [id, name, role, email, isBoss, active, managerId?]
     updateMember: async (a) => {
       const patch = { name: a[1], role: a[2] || 'ทีมงาน', email: (a[3] || '').toLowerCase() || null, is_boss: !!a[4], active: !!a[5] };
+      if (a.length > 6) patch.manager_id = a[6] || null;   // แอดมินเท่านั้นที่ส่งค่านี้มา
       const { data, error } = await SB.client.from('app_users').update(patch).eq('id', a[0]).select().single();
       if (error) throw error; return uUser(data);
     },

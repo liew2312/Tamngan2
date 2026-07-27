@@ -687,6 +687,8 @@
       <div class="field"><label>ชื่อ *</label><input id="f-name" placeholder="เช่น มุก"></div>
       <div class="field"><label>ตำแหน่ง</label><input id="f-role" placeholder="เช่น Site Engineer"></div>
       <div class="field"><label>อีเมล Google (สำหรับล็อกอิน)</label><input id="f-email" type="email" placeholder="เช่น somchai@apthai.com"></div>
+      <div class="field admin-only hidden"><div class="switch-row"><label for="f-isboss">เพิ่มเป็น "หัวหน้างาน" (มีทีมของตัวเอง)</label><input type="checkbox" id="f-isboss" style="width:20px;height:20px;" onchange="onAddRoleChange()"></div></div>
+      <div class="field admin-only hidden" id="f-mgr-field"><label>สังกัดหัวหน้างาน</label><select id="f-manager"></select></div>
       <div class="modal-actions">
         <button class="btn btn-ghost" onclick="closeOverlay('modal-member')">ยกเลิก</button>
         <button class="btn btn-primary" onclick="submitMember()"><i class="fa-solid fa-check"></i> เพิ่มสมาชิก</button>
@@ -702,7 +704,8 @@
       <div class="field"><label>ชื่อ *</label><input id="e-name"></div>
       <div class="field"><label>ตำแหน่ง</label><input id="e-role"></div>
       <div class="field"><label>อีเมล Google (สำหรับล็อกอิน)</label><input id="e-email" type="email" placeholder="เช่น somchai@apthai.com"></div>
-      <div class="field"><div class="switch-row"><label for="e-isboss">ตั้งเป็นหัวหน้าทีม</label><input type="checkbox" id="e-isboss" style="width:20px;height:20px;"></div></div>
+      <div class="field admin-only hidden"><div class="switch-row"><label for="e-isboss">ตั้งเป็นหัวหน้างาน (มีทีมของตัวเอง)</label><input type="checkbox" id="e-isboss" style="width:20px;height:20px;" onchange="onEditRoleChange()"></div></div>
+      <div class="field admin-only hidden" id="e-mgr-field"><label>สังกัดหัวหน้างาน</label><select id="e-manager"></select></div>
       <div class="field"><div class="switch-row"><label for="e-active">เปิดใช้งานบัญชี (ปิด = ล็อกอินไม่ได้)</label><input type="checkbox" id="e-active" style="width:20px;height:20px;"></div></div>
       <div class="modal-actions">
         <button class="btn btn-ghost" onclick="closeOverlay('modal-edit-member')">ยกเลิก</button>
@@ -754,6 +757,7 @@
     let dashFilter = 'team', taskFilter = 'all', activeTab = 'home', backFrom = 'user';
     let myUserId = null;      // กำหนดจากอีเมลผู้ใช้ที่ล็อกอิน (ฝั่งเซิร์ฟเวอร์เป็นผู้ระบุ)
     let isBoss = false;       // สิทธิ์หัวหน้าทีม (ฝั่งเซิร์ฟเวอร์เป็นผู้ตัดสิน)
+    let isAdmin = false;      // ผู้ดูแลระบบ — เห็นทุกทีม สร้างหัวหน้างานได้
     let currentUser = null;   // ข้อมูลผู้ใช้ปัจจุบัน (คนที่ล็อกอิน)
     const PASTEL = ['#5b82e0','#e8536e','#e8942f','#22a97a','#a06ddb','#3fa9c4','#e07b9a'];
     const APP_VERSION = '2.1';
@@ -1049,9 +1053,11 @@
       currentUser = cu;
       myUserId = cu.UserID || null;
       isBoss = !!cu.isBoss;
+      isAdmin = !!cu.isAdmin;
       if (prevId !== myUserId) todosCache = null; // เปลี่ยนผู้ใช้ → เคลียร์แคช to-do (กันเห็นของคนก่อนหน้า)
       // แสดง/ซ่อนเมนูจัดการตามสิทธิ์จริงจากเซิร์ฟเวอร์
       document.querySelectorAll('.boss-only').forEach(el => el.classList.toggle('hidden', !isBoss));
+      document.querySelectorAll('.admin-only').forEach(el => el.classList.toggle('hidden', !isAdmin));
       // Member: ซ่อนชิป "ทีม" และปรับหัวข้อหน้าหลักเป็น "งานของฉัน"
       const teamChip = document.querySelector('#filters .chip[data-f="team"]');
       if (teamChip) teamChip.classList.toggle('hidden', !isBoss);
@@ -1080,7 +1086,7 @@
       const a = args.slice(1); // ตัด actorEmail ที่ srv() แนบมา
       if (fn === 'addUser') {
         const id = 'U' + (appData.users.length + 1);
-        return { UserID: id, Name: a[0], Role: a[1] || 'ทีมงาน', Email: (a[2] || ''), Photo: '', Status: '', Active: 'TRUE', tasks: [] };
+        return { UserID: id, Name: a[0], Role: a[1] || 'ทีมงาน', Email: (a[2] || ''), ManagerID: a[3] || '', IsBoss: a[4] ? 'TRUE' : '', IsAdmin: '', Photo: '', Status: '', Active: 'TRUE', tasks: [] };
       }
       if (fn === 'addTask') {
         const id = 'T' + (appData.tasks.length + 1);
@@ -1105,7 +1111,11 @@
       }
       if (fn === 'touchActive') return true;
       if (fn === 'updateProfile') return { UserID: myUserId, Photo: a[0], Status: a[1] };
-      if (fn === 'updateMember') return { UserID: a[0], Name: a[1], Role: a[2], Email: a[3], IsBoss: a[4] ? 'TRUE' : '', Active: a[5] ? 'TRUE' : 'FALSE' };
+      if (fn === 'updateMember') {
+        const o = { UserID: a[0], Name: a[1], Role: a[2], Email: a[3], IsBoss: a[4] ? 'TRUE' : '', Active: a[5] ? 'TRUE' : 'FALSE' };
+        if (a.length > 6) o.ManagerID = a[6] || '';
+        return o;
+      }
       return true;
     }
 
@@ -1900,21 +1910,47 @@
     function renderTeam() {
       const el = document.getElementById('team-members');
       if (!appData.users.length) { el.innerHTML = emptyBox('ยังไม่มีสมาชิก', 'fa-user'); return; }
-      el.innerHTML = appData.users.map(u => {
+      // แอดมิน: จัดกลุ่มตามหัวหน้างาน / หัวหน้างาน+สมาชิก: รายชื่อเดียว (RLS กรองมาให้แล้ว)
+      if (isAdmin) {
+        const bosses = bossList();
+        let html = '';
+        bosses.forEach(b => {
+          const team = appData.users.filter(u => u.ManagerID === b.UserID && u.UserID !== b.UserID);
+          html += `<div class="section-title" style="margin:18px 0 8px;"><i class="fa-solid fa-user-tie"></i>ทีม ${escapeHtml(b.Name || '')} <span class="badge b-todo" style="margin-left:6px;">${team.length} คน</span></div>`;
+          html += memberRowHtml(b);
+          html += team.length ? team.map(memberRowHtml).join('')
+                              : `<p class="meta" style="margin:2px 0 0 6px;">— ยังไม่มีลูกน้องในทีมนี้ —</p>`;
+        });
+        const orphans = appData.users.filter(u => !isBossUser(u) && !bosses.some(b => b.UserID === u.ManagerID));
+        if (orphans.length) {
+          html += `<div class="section-title" style="margin:18px 0 8px;"><i class="fa-solid fa-user-slash"></i>ยังไม่สังกัดทีม <span class="badge b-todo" style="margin-left:6px;">${orphans.length} คน</span></div>`;
+          html += orphans.map(memberRowHtml).join('');
+        }
+        el.innerHTML = html;
+        return;
+      }
+      el.innerHTML = appData.users.map(memberRowHtml).join('');
+    }
+    function memberRowHtml(u) {
+      {
         const my = appData.tasks.filter(t => t.AssigneeID === u.UserID);
         const off = !isActive(u);
+        const roleBadge = String(u.IsAdmin).toUpperCase() === 'TRUE'
+          ? '<span class="badge b-todo" style="margin-left:4px;"><i class="fa-solid fa-shield-halved"></i>แอดมิน</span>'
+          : (String(u.IsBoss).toUpperCase() === 'TRUE'
+              ? '<span class="badge b-todo" style="margin-left:4px;"><i class="fa-solid fa-user-tie"></i>หัวหน้างาน</span>' : '');
         return `
           <div class="card row" style="${off ? 'opacity:.55;' : ''}" onclick="openUser('${u.UserID}','team')">
             ${avatarDiv(u)}
             <div style="flex-grow:1;">
-              <h4 style="margin:0; font-size:15px; font-weight:600;">${escapeHtml(u.Name||'')} ${off ? '<span class="badge b-todo" style="margin-left:4px;"><i class="fa-solid fa-ban"></i>ปิดใช้งาน</span>' : ''}</h4>
+              <h4 style="margin:0; font-size:15px; font-weight:600;">${escapeHtml(u.Name||'')} ${roleBadge} ${off ? '<span class="badge b-todo" style="margin-left:4px;"><i class="fa-solid fa-ban"></i>ปิดใช้งาน</span>' : ''}</h4>
               <p class="meta" style="margin:2px 0 0;"><i class="fa-solid fa-briefcase"></i>${escapeHtml(u.Role||'')}</p>
               ${statusLine(u)}
             </div>
             <span class="badge b-todo"><i class="fa-solid fa-clipboard-list"></i>${my.length}</span>
             ${isBoss ? `<button class="edit-mini boss-only" onclick="event.stopPropagation(); openEditMember('${u.UserID}')" title="แก้ไข"><i class="fa-solid fa-pen"></i></button>` : ''}
           </div>`;
-      }).join('');
+      }
     }
 
     /* ---------- shared task card ---------- */
@@ -2192,10 +2228,43 @@
         openTask(t.TaskID, backFrom);
       });
     }
+    /* ---------- ตัวช่วยเรื่องทีม/หัวหน้างาน ---------- */
+    function isBossUser(u) { return String(u.IsBoss).toUpperCase() === 'TRUE' || String(u.IsAdmin).toUpperCase() === 'TRUE'; }
+    function bossList() { return appData.users.filter(isBossUser); }
+    function managerNameOf(u) {
+      if (!u || !u.ManagerID) return '';
+      const m = appData.users.find(x => x.UserID === u.ManagerID);
+      return m ? (m.Name || '') : '';
+    }
+    // เติมตัวเลือกหัวหน้างานลง <select> (blank = ไม่สังกัดใคร)
+    function fillManagerSelect(selId, selectedId, allowNone) {
+      const sel = document.getElementById(selId);
+      if (!sel) return;
+      const opts = bossList().map(b =>
+        `<option value="${b.UserID}"${b.UserID === selectedId ? ' selected' : ''}>${escapeHtml(b.Name || '')}</option>`);
+      if (allowNone) opts.unshift(`<option value=""${!selectedId ? ' selected' : ''}>— ไม่สังกัดใคร (หัวหน้าอิสระ) —</option>`);
+      sel.innerHTML = opts.join('') || '<option value="">— ยังไม่มีหัวหน้างาน —</option>';
+    }
+    function onAddRoleChange() {
+      const boss = document.getElementById('f-isboss').checked;
+      fillManagerSelect('f-manager', boss ? '' : (myUserId || ''), boss);
+      document.getElementById('f-mgr-field').querySelector('label').innerText =
+        boss ? 'สังกัดหัวหน้างาน (ปล่อยว่างได้)' : 'สังกัดหัวหน้างาน';
+    }
+    function onEditRoleChange() {
+      const boss = document.getElementById('e-isboss').checked;
+      const cur = document.getElementById('e-manager').value;
+      fillManagerSelect('e-manager', cur, boss);
+    }
+
     function openMemberModal() {
       document.getElementById('f-name').value = '';
       document.getElementById('f-role').value = '';
       document.getElementById('f-email').value = '';
+      if (isAdmin) {
+        document.getElementById('f-isboss').checked = false;
+        onAddRoleChange();
+      }
       document.getElementById('modal-member').classList.remove('hidden');
     }
     function submitMember() {
@@ -2203,7 +2272,10 @@
       if (!name) { alert('กรุณากรอกชื่อ'); return; }
       const role = document.getElementById('f-role').value.trim() || 'ทีมงาน';
       const email = document.getElementById('f-email').value.trim();
-      srv('addUser', [name, role, email], (newUser) => {
+      // หัวหน้างานทั่วไป: เพิ่มได้เฉพาะลูกน้องในทีมตัวเอง (เซิร์ฟเวอร์บังคับอีกชั้น)
+      const asBoss = isAdmin && document.getElementById('f-isboss').checked;
+      const mgr = isAdmin ? document.getElementById('f-manager').value : (myUserId || '');
+      srv('addUser', [name, role, email, mgr, asBoss], (newUser) => {
         if (!newUser.tasks) newUser.tasks = [];
         appData.users.push(newUser);
         renderAll();
@@ -2224,6 +2296,7 @@
       document.getElementById('e-email').value = u.Email || '';
       document.getElementById('e-isboss').checked = String(u.IsBoss).toUpperCase() === 'TRUE';
       document.getElementById('e-active').checked = isActive(u);
+      if (isAdmin) fillManagerSelect('e-manager', u.ManagerID || '', isBossUser(u));
       document.getElementById('modal-edit-member').classList.remove('hidden');
     }
     function saveMember() {
@@ -2233,9 +2306,12 @@
       const email = document.getElementById('e-email').value.trim();
       const boss = document.getElementById('e-isboss').checked;
       const active = document.getElementById('e-active').checked;
-      srv('updateMember', [editMemberId, name, role, email, boss, active], (res) => {
+      // ส่ง managerId เฉพาะตอนเป็นแอดมิน — หัวหน้างานย้ายคนข้ามทีมไม่ได้
+      const args = [editMemberId, name, role, email, boss, active];
+      if (isAdmin) args.push(document.getElementById('e-manager').value);
+      srv('updateMember', args, (res) => {
         const u = appData.users.find(x => x.UserID === editMemberId);
-        if (u) { u.Name = res.Name; u.Role = res.Role; u.Email = res.Email; u.IsBoss = res.IsBoss; u.Active = res.Active; }
+        if (u) { u.Name = res.Name; u.Role = res.Role; u.Email = res.Email; u.IsBoss = res.IsBoss; u.Active = res.Active; if (res.ManagerID !== undefined) u.ManagerID = res.ManagerID; }
         appData.tasks.forEach(t => { if (t.AssigneeID === editMemberId) t.AssigneeName = res.Name; });
         renderAll();
         closeOverlay('modal-edit-member');
